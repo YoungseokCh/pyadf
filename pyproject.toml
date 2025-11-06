@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pyadf"
+version = "0.1.0"
+description = "A Python library for converting Atlassian Document Format (ADF) to Markdown"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [
+    {name = "Youngseok Choi", email = "me@youngseok.com"}
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Text Processing :: Markup",
+]
+keywords = ["adf", "markdown", "atlassian", "converter", "confluence", "jira"]
+
+[project.urls]
+Homepage = "https://github.com/YoungseokCh/pyadf"
+Repository = "https://github.com/YoungseokCh/pyadf"
+Issues = "https://github.com/YoungseokCh/pyadf/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["pyadf*"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+check_untyped_defs = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+ignore = []

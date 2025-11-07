@@ -14,25 +14,26 @@ logger = get_logger()
 class NodeType(enum.Enum):
     """Enumeration of ADF node types."""
 
-    PARAGRAPH = (0, "paragraph")
-    TEXT = (1, "text")
-    HARD_BREAK = (2, "hardBreak")
-    BULLET_LIST = (3, "bulletList")
-    LIST_ITEM = (4, "listItem")
-    PANEL = (5, "panel")
-    TABLE = (6, "table")
-    TABLE_ROW = (7, "tableRow")
-    TABLE_HEADER = (8, "tableHeader")
-    TABLE_CELL = (9, "tableCell")
-    CODE_BLOCK = (10, "codeBlock")
-    INLINE_CARD = (11, "inlineCard")
-    TASK_LIST = (12, "taskList")
-    TASK_ITEM = (13, "taskItem")
-    ORDERED_LIST = (14, "orderedList")
-    HEADING = (15, "heading")
-    UNKNOWN = (16, "unknown")
-    BLOCKQUOTE = (17, "blockquote")
-    STATUS = (18, "status")
+    DOC = (0, "doc")
+    PARAGRAPH = (1, "paragraph")
+    TEXT = (2, "text")
+    HARD_BREAK = (3, "hardBreak")
+    BULLET_LIST = (4, "bulletList")
+    LIST_ITEM = (5, "listItem")
+    PANEL = (6, "panel")
+    TABLE = (7, "table")
+    TABLE_ROW = (8, "tableRow")
+    TABLE_HEADER = (9, "tableHeader")
+    TABLE_CELL = (10, "tableCell")
+    CODE_BLOCK = (11, "codeBlock")
+    INLINE_CARD = (12, "inlineCard")
+    TASK_LIST = (13, "taskList")
+    TASK_ITEM = (14, "taskItem")
+    ORDERED_LIST = (15, "orderedList")
+    HEADING = (16, "heading")
+    UNKNOWN = (17, "unknown")
+    BLOCKQUOTE = (18, "blockquote")
+    STATUS = (19, "status")
 
     def __str__(self) -> str:
         return self.value[1]
@@ -102,6 +103,12 @@ class Node:
     def child_nodes(self) -> list["Node"]:
         """Get child nodes."""
         return self._child_nodes
+
+
+class DocNode(Node):
+    """Represents a document root node."""
+
+    pass
 
 
 class ParagraphNode(Node):
@@ -334,6 +341,7 @@ class StatusNode(Node):
 
 # Node registry for factory pattern
 _NODE_REGISTRY: dict[NodeType, type[Node]] = {
+    NodeType.DOC: DocNode,
     NodeType.PARAGRAPH: ParagraphNode,
     NodeType.TEXT: TextNode,
     NodeType.HARD_BREAK: HardBreakNode,

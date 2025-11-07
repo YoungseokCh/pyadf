@@ -5,6 +5,7 @@ from typing import Optional
 
 from .nodes import (
     CodeBlockNode,
+    DocNode,
     HeadingNode,
     InlineCardNode,
     Node,
@@ -76,6 +77,20 @@ class NodePresenter:
     def child_presenters(self) -> list["NodePresenter"]:
         """Get child presenters."""
         return self._child_presenters
+
+
+class DocPresenter(NodePresenter):
+    """Presenter for document root nodes."""
+
+    def __str__(self) -> str:
+        md_text_list = [str(cp) for cp in self._child_presenters]
+        # Filter out empty strings
+        md_text_list = [text for text in md_text_list if text]
+
+        if not md_text_list:
+            return ""
+
+        return "\n\n".join(md_text_list)
 
 
 class ParagraphPresenter(NodePresenter):
@@ -310,6 +325,7 @@ class StatusPresenter(NodePresenter):
 
 # Presenter registry for factory pattern
 _PRESENTER_REGISTRY: dict[NodeType, type[NodePresenter]] = {
+    NodeType.DOC: DocPresenter,
     NodeType.PARAGRAPH: ParagraphPresenter,
     NodeType.TEXT: TextPresenter,
     NodeType.HARD_BREAK: HardBreakPresenter,

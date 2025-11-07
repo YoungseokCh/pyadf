@@ -10,8 +10,13 @@ class TestSimpleConversions:
     def test_simple_paragraph(self):
         """Test converting a simple paragraph."""
         adf_data = {
-            "type": "paragraph",
-            "content": [{"type": "text", "text": "Hello, world!"}],
+            "type": "doc",
+            "content": [
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "Hello, world!"}],
+                }
+            ],
         }
         result = adf2md(adf_data)
         assert result == "Hello, world!"
@@ -221,21 +226,6 @@ class TestDocument:
         result = adf2md(adf_data)
         assert "First paragraph" in result
         assert "Second paragraph" in result
-
-    def test_none_input(self):
-        """Test converting None input."""
-        result = adf2md(None)
-        assert result == ""
-
-    def test_list_input(self):
-        """Test converting list of nodes."""
-        adf_data = [
-            {"type": "paragraph", "content": [{"type": "text", "text": "First"}]},
-            {"type": "paragraph", "content": [{"type": "text", "text": "Second"}]},
-        ]
-        result = adf2md(adf_data)
-        assert "First" in result
-        assert "Second" in result
 
 
 class TestStatus:

@@ -1,6 +1,6 @@
 # pyadf
 
-A Python library for converting Atlassian Document Format (ADF) to Markdown.
+A Python library for converting [Atlassian Document Format (ADF)](https://developer.atlassian.com/cloud/jira/platform/apis/document/structure/) to Markdown.
 
 ## Features
 

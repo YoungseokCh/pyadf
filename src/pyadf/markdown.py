@@ -6,6 +6,7 @@ from typing import Optional
 from .nodes import (
     CodeBlockNode,
     DocNode,
+    EmojiNode,
     HeadingNode,
     InlineCardNode,
     Node,
@@ -347,6 +348,19 @@ class StatusPresenter(NodePresenter):
         return f"**[{status_text}]**"
 
 
+class EmojiPresenter(NodePresenter):
+    """Presenter for emoji nodes."""
+
+    def __init__(self, node: Node, context: Optional[RenderContext] = None) -> None:
+        if not isinstance(node, EmojiNode):
+            raise ValueError("node is not an EmojiNode")
+        super().__init__(node, context)
+        self._emoji_node = node
+
+    def __str__(self) -> str:
+        return self._emoji_node.text or self._emoji_node.short_name
+
+
 # Presenter registry for factory pattern
 _PRESENTER_REGISTRY: dict[NodeType, type[NodePresenter]] = {
     NodeType.DOC: DocPresenter,
@@ -368,6 +382,7 @@ _PRESENTER_REGISTRY: dict[NodeType, type[NodePresenter]] = {
     NodeType.INLINE_CARD: InlineCardPresenter,
     NodeType.HEADING: HeadingPresenter,
     NodeType.STATUS: StatusPresenter,
+    NodeType.EMOJI: EmojiPresenter,
 }
 
 

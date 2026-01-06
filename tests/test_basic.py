@@ -298,3 +298,51 @@ class TestMarkdownConfig:
         """Test that invalid bullet marker raises ValueError."""
         with pytest.raises(ValueError, match="Invalid bullet_marker"):
             MarkdownConfig(bullet_marker="x")
+
+
+class TestEmoji:
+    """Test emoji conversions."""
+
+    def test_emoji_with_text(self):
+        """Test emoji with text attribute returns unicode."""
+        adf_data = {
+            "type": "emoji",
+            "attrs": {"shortName": ":grinning:", "text": "😀"},
+        }
+        result = Document(adf_data).to_markdown()
+        assert result == "😀"
+
+    def test_emoji_without_text_fallback_to_shortname(self):
+        """Test emoji without text falls back to shortName."""
+        adf_data = {
+            "type": "emoji",
+            "attrs": {"shortName": ":thumbsup:"},
+        }
+        result = Document(adf_data).to_markdown()
+        assert result == ":thumbsup:"
+
+    def test_emoji_in_paragraph(self):
+        """Test emoji within a paragraph."""
+        adf_data = {
+            "type": "paragraph",
+            "content": [
+                {"type": "text", "text": "Hello "},
+                {"type": "emoji", "attrs": {"shortName": ":wave:", "text": "👋"}},
+                {"type": "text", "text": " world!"},
+            ],
+        }
+        result = Document(adf_data).to_markdown()
+        assert result == "Hello 👋 world!"
+
+    def test_atlassian_emoji(self):
+        """Test Atlassian custom emoji falls back to shortName."""
+        adf_data = {
+            "type": "emoji",
+            "attrs": {
+                "shortName": ":awthanks:",
+                "id": "atlassian-awthanks",
+                "text": ":awthanks:",
+            },
+        }
+        result = Document(adf_data).to_markdown()
+        assert result == ":awthanks:"

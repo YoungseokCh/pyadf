@@ -40,6 +40,7 @@ class NodeType(enum.Enum):
     UNKNOWN = (17, "unknown")
     BLOCKQUOTE = (18, "blockquote")
     STATUS = (19, "status")
+    EMOJI = (20, "emoji")
 
     def __str__(self) -> str:
         return self.value[1]
@@ -376,6 +377,25 @@ class StatusNode(Node):
         return self._attrs.get("color", "")
 
 
+class EmojiNode(Node):
+    """Represents an emoji."""
+
+    @property
+    def short_name(self) -> str:
+        """Get the emoji short name (e.g., ':grinning:')."""
+        return self._attrs.get("shortName", "")
+
+    @property
+    def emoji_id(self) -> Optional[str]:
+        """Get the emoji service ID."""
+        return self._attrs.get("id")
+
+    @property
+    def text(self) -> Optional[str]:
+        """Get the text representation of the emoji (unicode character)."""
+        return self._attrs.get("text")
+
+
 # Node registry for factory pattern
 _NODE_REGISTRY: dict[NodeType, type[Node]] = {
     NodeType.DOC: DocNode,
@@ -397,6 +417,7 @@ _NODE_REGISTRY: dict[NodeType, type[Node]] = {
     NodeType.INLINE_CARD: InlineCardNode,
     NodeType.HEADING: HeadingNode,
     NodeType.STATUS: StatusNode,
+    NodeType.EMOJI: EmojiNode,
 }
 
 
@@ -409,7 +430,6 @@ _KNOWN_UNSUPPORTED_TYPES = {
     "rule",
     "media",
     "mention",
-    "emoji",
     "embedCard",
 }
 

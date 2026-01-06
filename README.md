@@ -114,6 +114,33 @@ doc = Document(adf_data)
 markdown = doc.to_markdown()
 ```
 
+### Customizing Markdown Output
+
+Use `MarkdownConfig` to customize the generated markdown:
+
+```python
+from pyadf import Document, MarkdownConfig
+
+doc = Document(adf_data)
+
+# Default bullet marker is +
+doc.to_markdown()  # "+ Item 1\n+ Item 2"
+
+# Use * for bullet lists
+config = MarkdownConfig(bullet_marker="*")
+doc.to_markdown(config)  # "* Item 1\n* Item 2"
+
+# Use - for bullet lists
+config = MarkdownConfig(bullet_marker="-")
+doc.to_markdown(config)  # "- Item 1\n- Item 2"
+```
+
+Available options:
+
+| Option | Values | Default | Description |
+|--------|--------|---------|-------------|
+| `bullet_marker` | `+`, `-`, `*` | `+` | Character used for bullet list items |
+
 ## Supported ADF Node Types
 
 | ADF Node Type | Markdown Output | Notes |

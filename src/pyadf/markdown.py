@@ -1,6 +1,6 @@
 """Markdown generation from ADF nodes using presenter pattern."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 from .nodes import (
@@ -17,20 +17,35 @@ from .nodes import (
 
 
 @dataclass
+class MarkdownConfig:
+    """Configuration options for markdown generation."""
+
+    bullet_marker: str = "+"
+
+    def __post_init__(self) -> None:
+        if self.bullet_marker not in ("+", "-", "*"):
+            raise ValueError(f"Invalid bullet_marker: {self.bullet_marker!r}")
+
+
+@dataclass
 class RenderContext:
     """Context for rendering markdown, replacing multiple boolean flags."""
 
     is_first: bool = False
     is_prev_hard_break: bool = False
     parent_node: Optional[Node] = None
+    config: MarkdownConfig = field(default_factory=MarkdownConfig)
 
 
-def gen_md_from_root_node(root_node: Node) -> str:
+def gen_md_from_root_node(
+    root_node: Node, config: Optional[MarkdownConfig] = None
+) -> str:
     """
     Generate markdown from a root ADF node.
 
     Args:
         root_node: The root node to convert
+        config: Optional markdown configuration options
 
     Returns:
         Markdown string representation
@@ -38,8 +53,11 @@ def gen_md_from_root_node(root_node: Node) -> str:
     Raises:
         ValueError: If presenter creation or rendering fails
     """
+    if config is None:
+        config = MarkdownConfig()
+
     root_node_presenter = create_node_presenter_from_node(
-        root_node, RenderContext(is_first=True)
+        root_node, RenderContext(is_first=True, config=config)
     )
 
     if root_node_presenter is None:
@@ -53,6 +71,7 @@ class NodePresenter:
 
     def __init__(self, node: Node, context: Optional[RenderContext] = None) -> None:
         self._node = node
+        self._context = context or RenderContext()
         self._child_presenters: list[NodePresenter] = []
 
         cur_node_type = None
@@ -61,6 +80,7 @@ class NodePresenter:
                 is_first=(idx == 0),
                 is_prev_hard_break=(cur_node_type == NodeType.HARD_BREAK),
                 parent_node=self._node,
+                config=self._context.config,
             )
             child_presenter = create_node_presenter_from_node(child, child_context)
             if child_presenter:
@@ -156,7 +176,8 @@ class BulletListPresenter(NodePresenter):
     """Presenter for bullet list nodes."""
 
     def __str__(self) -> str:
-        bulleted_list = [f"+ {str(cp)}" for cp in self._child_presenters]
+        marker = self._context.config.bullet_marker
+        bulleted_list = [f"{marker} {str(cp)}" for cp in self._child_presenters]
         return "\n".join(bulleted_list)
 
 

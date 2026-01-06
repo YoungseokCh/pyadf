@@ -1,7 +1,7 @@
 """Basic tests for pyadf functionality."""
 
 import pytest
-from pyadf import Document
+from pyadf import Document, MarkdownConfig
 
 
 class TestSimpleConversions:
@@ -239,3 +239,62 @@ class TestStatus:
         }
         result = Document(adf_data).to_markdown()
         assert result == "**[DONE]**"
+
+
+class TestMarkdownConfig:
+    """Test MarkdownConfig options."""
+
+    def test_default_bullet_marker(self):
+        """Test default bullet marker is +."""
+        adf_data = {
+            "type": "bulletList",
+            "content": [
+                {
+                    "type": "listItem",
+                    "content": [
+                        {"type": "paragraph", "content": [{"type": "text", "text": "Item"}]}
+                    ],
+                },
+            ],
+        }
+        result = Document(adf_data).to_markdown()
+        assert result == "+ Item"
+
+    def test_asterisk_bullet_marker(self):
+        """Test bullet marker can be set to *."""
+        adf_data = {
+            "type": "bulletList",
+            "content": [
+                {
+                    "type": "listItem",
+                    "content": [
+                        {"type": "paragraph", "content": [{"type": "text", "text": "Item"}]}
+                    ],
+                },
+            ],
+        }
+        config = MarkdownConfig(bullet_marker="*")
+        result = Document(adf_data).to_markdown(config)
+        assert result == "* Item"
+
+    def test_dash_bullet_marker(self):
+        """Test bullet marker can be set to -."""
+        adf_data = {
+            "type": "bulletList",
+            "content": [
+                {
+                    "type": "listItem",
+                    "content": [
+                        {"type": "paragraph", "content": [{"type": "text", "text": "Item"}]}
+                    ],
+                },
+            ],
+        }
+        config = MarkdownConfig(bullet_marker="-")
+        result = Document(adf_data).to_markdown(config)
+        assert result == "- Item"
+
+    def test_invalid_bullet_marker(self):
+        """Test that invalid bullet marker raises ValueError."""
+        with pytest.raises(ValueError, match="Invalid bullet_marker"):
+            MarkdownConfig(bullet_marker="x")

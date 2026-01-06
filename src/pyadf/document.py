@@ -1,10 +1,10 @@
 """Document class for ADF to Markdown conversion."""
 
 import json
-from typing import Optional, Union
 
 from . import markdown, nodes
 from .exceptions import InvalidInputError, InvalidJSONError
+from .markdown import MarkdownConfig
 
 
 class Document:
@@ -24,7 +24,7 @@ class Document:
         >>> markdown_text = doc.to_markdown()  # Returns ""
     """
 
-    def __init__(self, adf: Optional[Union[str, dict]] = None) -> None:
+    def __init__(self, adf: str | dict | None = None) -> None:
         """
         Initialize a Document from ADF data.
 
@@ -40,7 +40,7 @@ class Document:
             InvalidFieldError: If fields have invalid values
             NodeCreationError: If node creation fails
         """
-        self._root_node: Optional[nodes.Node] = None
+        self._root_node: nodes.Node | None = None
 
         if adf is None:
             # Empty document
@@ -67,9 +67,12 @@ class Document:
         # Create node from the dict
         self._root_node = nodes.create_node_from_dict(adf_dict)
 
-    def to_markdown(self) -> str:
+    def to_markdown(self, config: MarkdownConfig | None = None) -> str:
         """
         Convert the ADF document to Markdown.
+
+        Args:
+            config: Optional markdown configuration options
 
         Returns:
             Markdown representation of the ADF content. Returns empty string
@@ -78,4 +81,4 @@ class Document:
         if self._root_node is None:
             return ""
 
-        return markdown.gen_md_from_root_node(self._root_node)
+        return markdown.gen_md_from_root_node(self._root_node, config)

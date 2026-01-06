@@ -15,6 +15,7 @@ A Python library for converting [Atlassian Document Format (ADF)](https://develo
   - Blockquotes and panels
   - Status badges
   - Inline cards
+  - Emoji (unicode and shortName)
 - **Type-safe** with comprehensive type hints and Python 3.11+ support
 - **Extensible architecture** with registry pattern for custom node types
 - **Robust error handling** with detailed, context-aware error messages
@@ -114,6 +115,33 @@ doc = Document(adf_data)
 markdown = doc.to_markdown()
 ```
 
+### Customizing Markdown Output
+
+Use `MarkdownConfig` to customize the generated markdown:
+
+```python
+from pyadf import Document, MarkdownConfig
+
+doc = Document(adf_data)
+
+# Default bullet marker is +
+doc.to_markdown()  # "+ Item 1\n+ Item 2"
+
+# Use * for bullet lists
+config = MarkdownConfig(bullet_marker="*")
+doc.to_markdown(config)  # "* Item 1\n* Item 2"
+
+# Use - for bullet lists
+config = MarkdownConfig(bullet_marker="-")
+doc.to_markdown(config)  # "- Item 1\n- Item 2"
+```
+
+Available options:
+
+| Option | Values | Default | Description |
+|--------|--------|---------|-------------|
+| `bullet_marker` | `+`, `-`, `*` | `+` | Character used for bullet list items |
+
 ## Supported ADF Node Types
 
 | ADF Node Type | Markdown Output | Notes |
@@ -131,6 +159,7 @@ markdown = doc.to_markdown()
 | `table` | Markdown table | Supports headers and colspan |
 | `status` | `**[STATUS]**` | Status badges |
 | `inlineCard` | `[link]` or code block | Link previews |
+| `emoji` | Unicode emoji | |
 | `hardBreak` | Line break | |
 
 ## Exception Types
@@ -173,7 +202,12 @@ MIT License - see LICENSE file for details
 
 ## Changelog
 
-### 0.1.0 (Current)
+### 0.3.0 (Current)
+
+- Added emoji node support
+- Added configurable bullet markers via `MarkdownConfig`
+
+### 0.1.0
 
 - Class-based API with `Document` class
 - Better error handling with detailed exceptions and context

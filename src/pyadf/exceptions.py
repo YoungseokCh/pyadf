@@ -1,18 +1,18 @@
 """Exception classes for pyadf with detailed error context."""
 
-from typing import Optional
 
 
 class PyADFError(Exception):
     """Base exception for all pyadf errors."""
 
-    def __init__(self, message: str, node_path: Optional[str] = None) -> None:
+    def __init__(self, message: str, node_path: str | None = None) -> None:
         """
         Initialize the exception.
 
         Args:
             message: Human-readable error message
-            node_path: Optional path showing location in ADF tree (e.g., "doc > paragraph[0] > text")
+            node_path: Optional path showing location in ADF tree
+                (e.g., "doc > paragraph[0] > text")
         """
         self.message = message
         self.node_path = node_path
@@ -37,9 +37,9 @@ class MissingFieldError(InvalidADFError):
     def __init__(
         self,
         field_name: str,
-        node_type: Optional[str] = None,
-        node_path: Optional[str] = None,
-        expected_values: Optional[list[str]] = None,
+        node_type: str | None = None,
+        node_path: str | None = None,
+        expected_values: list[str] | None = None,
     ) -> None:
         """
         Initialize missing field error.
@@ -76,9 +76,9 @@ class InvalidFieldError(InvalidADFError):
         self,
         field_name: str,
         invalid_value: str,
-        node_type: Optional[str] = None,
-        node_path: Optional[str] = None,
-        expected_values: Optional[list[str]] = None,
+        node_type: str | None = None,
+        node_path: str | None = None,
+        expected_values: list[str] | None = None,
     ) -> None:
         """
         Initialize invalid field error.
@@ -116,8 +116,8 @@ class UnsupportedNodeTypeError(PyADFError):
     def __init__(
         self,
         node_type: str,
-        node_path: Optional[str] = None,
-        supported_types: Optional[list[str]] = None,
+        node_path: str | None = None,
+        supported_types: list[str] | None = None,
     ) -> None:
         """
         Initialize unsupported node type error.
@@ -146,7 +146,7 @@ class UnsupportedNodeTypeError(PyADFError):
 class InvalidJSONError(InvalidADFError):
     """Raised when ADF JSON cannot be parsed."""
 
-    def __init__(self, json_error: str, position: Optional[int] = None) -> None:
+    def __init__(self, json_error: str, position: int | None = None) -> None:
         """
         Initialize invalid JSON error.
 
@@ -171,8 +171,8 @@ class NodeCreationError(PyADFError):
         self,
         node_type: str,
         reason: str,
-        node_path: Optional[str] = None,
-        original_error: Optional[Exception] = None,
+        node_path: str | None = None,
+        original_error: Exception | None = None,
     ) -> None:
         """
         Initialize node creation error.
@@ -210,6 +210,6 @@ class InvalidInputError(PyADFError):
         self.actual_type = actual_type
 
         message = f"Invalid input type: expected {expected_type}, got {actual_type}"
-        message += f"\n  Hint: Document() accepts JSON string, dict, or None"
+        message += "\n  Hint: Document() accepts JSON string, dict, or None"
 
         super().__init__(message)

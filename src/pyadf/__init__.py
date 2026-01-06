@@ -1,7 +1,7 @@
 """pyadf - A Python library for converting Atlassian Document Format (ADF) to Markdown."""
 
-from .document import Document
 from ._logger import set_debug_mode
+from .document import Document
 from .exceptions import (
     InvalidADFError,
     InvalidFieldError,
@@ -12,10 +12,12 @@ from .exceptions import (
     PyADFError,
     UnsupportedNodeTypeError,
 )
+from .markdown import MarkdownConfig
 
 __version__ = "0.1.0"
 __all__ = [
     "Document",
+    "MarkdownConfig",
     "set_debug_mode",
     "PyADFError",
     "InvalidADFError",

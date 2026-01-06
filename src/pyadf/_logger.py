@@ -2,10 +2,9 @@
 
 import logging
 import sys
-from typing import Optional
 
 # Configure default logger
-_logger: Optional[logging.Logger] = None
+_logger: logging.Logger | None = None
 
 
 def get_logger() -> logging.Logger:

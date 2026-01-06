@@ -1,11 +1,9 @@
 """Markdown generation from ADF nodes using presenter pattern."""
 
 from dataclasses import dataclass, field
-from typing import Optional
 
 from .nodes import (
     CodeBlockNode,
-    DocNode,
     EmojiNode,
     HeadingNode,
     InlineCardNode,
@@ -34,12 +32,12 @@ class RenderContext:
 
     is_first: bool = False
     is_prev_hard_break: bool = False
-    parent_node: Optional[Node] = None
+    parent_node: Node | None = None
     config: MarkdownConfig = field(default_factory=MarkdownConfig)
 
 
 def gen_md_from_root_node(
-    root_node: Node, config: Optional[MarkdownConfig] = None
+    root_node: Node, config: MarkdownConfig | None = None
 ) -> str:
     """
     Generate markdown from a root ADF node.
@@ -70,7 +68,7 @@ def gen_md_from_root_node(
 class NodePresenter:
     """Base presenter for converting ADF nodes to markdown."""
 
-    def __init__(self, node: Node, context: Optional[RenderContext] = None) -> None:
+    def __init__(self, node: Node, context: RenderContext | None = None) -> None:
         self._node = node
         self._context = context or RenderContext()
         self._child_presenters: list[NodePresenter] = []
@@ -120,11 +118,11 @@ class DocPresenter(NodePresenter):
 class ParagraphPresenter(NodePresenter):
     """Presenter for paragraph nodes."""
 
-    def __init__(self, node: Node, context: Optional[RenderContext] = None) -> None:
+    def __init__(self, node: Node, context: RenderContext | None = None) -> None:
         super().__init__(node, context)
         self._no_leading_newlines = self._should_skip_leading_newline(context)
 
-    def _should_skip_leading_newline(self, context: Optional[RenderContext]) -> bool:
+    def _should_skip_leading_newline(self, context: RenderContext | None) -> bool:
         """Determine if leading newline should be skipped."""
         if context is None:
             return False
@@ -145,7 +143,7 @@ class ParagraphPresenter(NodePresenter):
 class TextPresenter(NodePresenter):
     """Presenter for text nodes."""
 
-    def __init__(self, node: Node, context: Optional[RenderContext] = None) -> None:
+    def __init__(self, node: Node, context: RenderContext | None = None) -> None:
         if not isinstance(node, TextNode):
             raise ValueError("node is not a TextNode")
         super().__init__(node, context)
@@ -248,7 +246,7 @@ class TablePresenter(NodePresenter):
                 for child in row_presenter.child_presenters
             )
 
-            if is_header:
+            if is_header and isinstance(row_presenter, TableRowPresenter):
                 # Insert separator: | --- | --- | --- |
                 col_count = row_presenter.column_count
                 row_list.append(f"| {' | '.join(['---'] * col_count)} |")
@@ -259,7 +257,7 @@ class TablePresenter(NodePresenter):
 class TableRowPresenter(NodePresenter):
     """Presenter for table row nodes."""
 
-    def __init__(self, node: Node, context: Optional[RenderContext] = None) -> None:
+    def __init__(self, node: Node, context: RenderContext | None = None) -> None:
         if not isinstance(node, TableRowNode):
             raise ValueError("node is not a TableRowNode")
         super().__init__(node, context)
@@ -284,7 +282,7 @@ class TableCellPresenter(NodePresenter):
 class CodeBlockPresenter(NodePresenter):
     """Presenter for code block nodes."""
 
-    def __init__(self, node: Node, context: Optional[RenderContext] = None) -> None:
+    def __init__(self, node: Node, context: RenderContext | None = None) -> None:
         if not isinstance(node, CodeBlockNode):
             raise ValueError("node is not a CodeBlockNode")
         super().__init__(node, context)
@@ -303,7 +301,7 @@ class CodeBlockPresenter(NodePresenter):
 class InlineCardPresenter(NodePresenter):
     """Presenter for inline card nodes."""
 
-    def __init__(self, node: Node, context: Optional[RenderContext] = None) -> None:
+    def __init__(self, node: Node, context: RenderContext | None = None) -> None:
         if not isinstance(node, InlineCardNode):
             raise ValueError("node is not an InlineCardNode")
         super().__init__(node, context)
@@ -321,7 +319,7 @@ class InlineCardPresenter(NodePresenter):
 class HeadingPresenter(NodePresenter):
     """Presenter for heading nodes."""
 
-    def __init__(self, node: Node, context: Optional[RenderContext] = None) -> None:
+    def __init__(self, node: Node, context: RenderContext | None = None) -> None:
         if not isinstance(node, HeadingNode):
             raise ValueError("node is not a HeadingNode")
         super().__init__(node, context)
@@ -337,7 +335,7 @@ class HeadingPresenter(NodePresenter):
 class StatusPresenter(NodePresenter):
     """Presenter for status badge nodes."""
 
-    def __init__(self, node: Node, context: Optional[RenderContext] = None) -> None:
+    def __init__(self, node: Node, context: RenderContext | None = None) -> None:
         if not isinstance(node, StatusNode):
             raise ValueError("node is not a StatusNode")
         super().__init__(node, context)
@@ -351,7 +349,7 @@ class StatusPresenter(NodePresenter):
 class EmojiPresenter(NodePresenter):
     """Presenter for emoji nodes."""
 
-    def __init__(self, node: Node, context: Optional[RenderContext] = None) -> None:
+    def __init__(self, node: Node, context: RenderContext | None = None) -> None:
         if not isinstance(node, EmojiNode):
             raise ValueError("node is not an EmojiNode")
         super().__init__(node, context)
@@ -387,8 +385,8 @@ _PRESENTER_REGISTRY: dict[NodeType, type[NodePresenter]] = {
 
 
 def create_node_presenter_from_node(
-    node: Node, context: Optional[RenderContext] = None
-) -> Optional[NodePresenter]:
+    node: Node, context: RenderContext | None = None
+) -> NodePresenter | None:
     """
     Create a presenter for a node using registry pattern.
 

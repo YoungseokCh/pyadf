@@ -1,10 +1,7 @@
 """ADF node models with type-safe representations."""
 
 import enum
-import json
-from pathlib import Path
 from typing import Optional
-from uuid import uuid4
 
 from ._logger import get_logger
 from .exceptions import (
@@ -117,7 +114,7 @@ class Node:
             node_dict["content"] if ("content" in node_dict) and (node_dict["content"]) else []
         )
 
-        self._child_nodes: list["Node"] = []
+        self._child_nodes: list[Node] = []
         for idx, child_node in enumerate(self._content):
             child_path = f"{node_path} > {self._type_str}[{idx}]" if node_path else self._type_str
             try:
@@ -283,7 +280,7 @@ class TableNode(Node):
     def header(self) -> Optional["TableRowNode"]:
         """Get the table header row if it exists."""
 
-        def has_header_cells(node: Optional[Node]) -> bool:
+        def has_header_cells(node: Node | None) -> bool:
             if node is None or node.type != NodeType.TABLE_ROW:
                 return False
             return any(child.type == NodeType.TABLE_HEADER for child in node.child_nodes)
@@ -335,7 +332,7 @@ class CodeBlockNode(Node):
     """Represents a code block."""
 
     @property
-    def language(self) -> Optional[str]:
+    def language(self) -> str | None:
         """Get the programming language of the code block."""
         return self._attrs.get("language")
 
@@ -344,12 +341,12 @@ class InlineCardNode(Node):
     """Represents an inline card (link preview)."""
 
     @property
-    def url(self) -> Optional[str]:
+    def url(self) -> str | None:
         """Get the URL of the inline card."""
         return self._attrs.get("url")
 
     @property
-    def data(self) -> Optional[str]:
+    def data(self) -> str | None:
         """Get the data of the inline card."""
         return self._attrs.get("data")
 
@@ -386,12 +383,12 @@ class EmojiNode(Node):
         return self._attrs.get("shortName", "")
 
     @property
-    def emoji_id(self) -> Optional[str]:
+    def emoji_id(self) -> str | None:
         """Get the emoji service ID."""
         return self._attrs.get("id")
 
     @property
-    def text(self) -> Optional[str]:
+    def text(self) -> str | None:
         """Get the text representation of the emoji (unicode character)."""
         return self._attrs.get("text")
 
@@ -434,7 +431,7 @@ _KNOWN_UNSUPPORTED_TYPES = {
 }
 
 
-def create_node_from_dict(node_dict: dict, node_path: str = "") -> Optional[Node]:
+def create_node_from_dict(node_dict: dict, node_path: str = "") -> Node | None:
     """
     Create a node from a dictionary using registry pattern.
 
@@ -484,7 +481,7 @@ def create_node_from_dict(node_dict: dict, node_path: str = "") -> Optional[Node
         raise UnsupportedNodeTypeError(
             node_type=node_type_str,
             node_path=current_path,
-            supported_types=list(_NODE_REGISTRY.keys()),
+            supported_types=[str(k) for k in _NODE_REGISTRY.keys()],
         )
 
     try:

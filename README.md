@@ -154,7 +154,7 @@ All exceptions include detailed context about the error location in the ADF tree
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/pyadf.git
+git clone https://github.com/YoungseokCh/pyadf.git
 cd pyadf
 
 # Install in development mode

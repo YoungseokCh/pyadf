@@ -18,6 +18,7 @@ A Python library for converting [Atlassian Document Format (ADF)](https://develo
   - Status badges
   - Inline cards
   - Emoji (unicode and shortName)
+  - Mentions
 - **Type-safe** with comprehensive type hints and Python 3.11+ support
 - **Extensible architecture** with registry pattern for custom node types
 - **Robust error handling** with detailed, context-aware error messages
@@ -163,6 +164,7 @@ Available options:
 | `inlineCard` | `[link]` or code block | Link previews |
 | `emoji` | Unicode emoji | |
 | `hardBreak` | Line break | |
+| `mention` | `@Jirauser Displayname` | Outputs mentioned Jira user's display name prefixed with an @ |
 
 ## Exception Types
 
@@ -204,7 +206,11 @@ MIT License - see LICENSE file for details
 
 ## Changelog
 
-### 0.3.0 (Current)
+### 0.3.1 (Current)
+
+- Added mention node support
+
+### 0.3.0
 
 - Added emoji node support
 - Added configurable bullet markers via `MarkdownConfig`

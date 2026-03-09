@@ -7,6 +7,7 @@ from .nodes import (
     EmojiNode,
     HeadingNode,
     InlineCardNode,
+    MentionNode,
     Node,
     NodeType,
     StatusNode,
@@ -359,6 +360,19 @@ class EmojiPresenter(NodePresenter):
         return self._emoji_node.text or self._emoji_node.short_name
 
 
+class MentionPresenter(NodePresenter):
+    """Presenter for mention nodes."""
+
+    def __init__(self, node: Node, context: RenderContext | None = None) -> None:
+        if not isinstance(node, MentionNode):
+            raise ValueError("node is not an MentionNode")
+        super().__init__(node, context)
+        self._mention_node = node
+
+    def __str__(self) -> str:
+        return self._mention_node.text
+
+
 # Presenter registry for factory pattern
 _PRESENTER_REGISTRY: dict[NodeType, type[NodePresenter]] = {
     NodeType.DOC: DocPresenter,
@@ -381,6 +395,7 @@ _PRESENTER_REGISTRY: dict[NodeType, type[NodePresenter]] = {
     NodeType.HEADING: HeadingPresenter,
     NodeType.STATUS: StatusPresenter,
     NodeType.EMOJI: EmojiPresenter,
+    NodeType.MENTION: MentionPresenter,
 }
 
 

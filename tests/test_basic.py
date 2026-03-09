@@ -346,3 +346,20 @@ class TestEmoji:
         }
         result = Document(adf_data).to_markdown()
         assert result == ":awthanks:"
+
+
+class TestMention:
+    """Test mention conversions."""
+
+    def test_mention(self):
+        """Test Atlassian mentions dump expected text."""
+        adf_data = {
+          "type": "mention",
+          "attrs": {
+            "id": "8675309",
+            "text": "@Tommy Tutone",
+            "accessLevel": ""
+          }
+        }
+        result = Document(adf_data).to_markdown()
+        assert result == "@Tommy Tutone"

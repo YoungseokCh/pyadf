@@ -38,6 +38,7 @@ class NodeType(enum.Enum):
     BLOCKQUOTE = (18, "blockquote")
     STATUS = (19, "status")
     EMOJI = (20, "emoji")
+    MENTION = (21, "mention")
 
     def __str__(self) -> str:
         return self.value[1]
@@ -393,6 +394,18 @@ class EmojiNode(Node):
         return self._attrs.get("text")
 
 
+class MentionNode(Node):
+    """Represents an mention."""
+
+    @property
+    def id(self) -> str | None:
+        return self._attrs.get("id")
+
+    @property
+    def text(self) -> str | None:
+        return self._attrs.get("text")
+
+
 # Node registry for factory pattern
 _NODE_REGISTRY: dict[NodeType, type[Node]] = {
     NodeType.DOC: DocNode,
@@ -415,6 +428,7 @@ _NODE_REGISTRY: dict[NodeType, type[Node]] = {
     NodeType.HEADING: HeadingNode,
     NodeType.STATUS: StatusNode,
     NodeType.EMOJI: EmojiNode,
+    NodeType.MENTION: MentionNode,
 }
 
 
@@ -426,7 +440,6 @@ _KNOWN_UNSUPPORTED_TYPES = {
     "expand",
     "rule",
     "media",
-    "mention",
     "embedCard",
 }
 

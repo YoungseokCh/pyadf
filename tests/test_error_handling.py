@@ -1,5 +1,7 @@
 """Tests for error handling and error messages."""
 
+from typing import cast
+
 import pytest
 from pyadf import (
     Document,
@@ -9,6 +11,7 @@ from pyadf import (
     MissingFieldError,
     UnsupportedNodeTypeError,
 )
+from pyadf._types import JSONObject
 
 
 class TestJSONErrors:
@@ -26,13 +29,22 @@ class TestJSONErrors:
     def test_invalid_input_type(self):
         """Test error message for invalid input type."""
         with pytest.raises(InvalidInputError) as exc_info:
-            Document(12345)
+            Document(cast("str | JSONObject | None", 12345))
 
         error = exc_info.value
         assert "Invalid input type" in str(error)
         assert "expected str, dict, or None" in str(error)
         assert "got int" in str(error)
         assert "Hint:" in str(error)
+
+    def test_json_must_decode_to_object(self):
+        """Test that JSON strings decode to an object node."""
+        with pytest.raises(InvalidInputError) as exc_info:
+            Document('[{"type": "paragraph"}]')
+
+        error = exc_info.value
+        assert "expected JSON object, dict, or None" in str(error)
+        assert "got list" in str(error)
 
 
 class TestMissingFieldErrors:
@@ -189,4 +201,13 @@ class TestValidData:
         """Test that None input works correctly."""
         doc = Document(None)
         result = doc.to_markdown()
+        assert result == ""
+
+
+class TestMentionFallback:
+    """Test mention rendering fallbacks."""
+
+    def test_mention_without_text_returns_empty_string(self):
+        """Test mention nodes without text render as empty string."""
+        result = Document({"type": "mention", "attrs": {"id": "8675309"}}).to_markdown()
         assert result == ""

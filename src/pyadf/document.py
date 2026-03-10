@@ -1,8 +1,10 @@
 """Document class for ADF to Markdown conversion."""
 
 import json
+from typing import cast
 
 from . import markdown, nodes
+from ._types import JSONObject
 from .exceptions import InvalidInputError, InvalidJSONError
 from .markdown import MarkdownConfig
 
@@ -24,7 +26,7 @@ class Document:
         >>> markdown_text = doc.to_markdown()  # Returns ""
     """
 
-    def __init__(self, adf: str | dict | None = None) -> None:
+    def __init__(self, adf: str | JSONObject | None = None) -> None:
         """
         Initialize a Document from ADF data.
 
@@ -46,26 +48,34 @@ class Document:
             # Empty document
             return
 
+        adf_value: object = adf
+
         # Handle string input (JSON)
-        if isinstance(adf, str):
+        if isinstance(adf_value, str):
             try:
-                adf_dict = json.loads(adf)
+                raw_adf: object = json.loads(adf_value)
             except json.JSONDecodeError as e:
                 # Extract position from error message if available
                 position = None
                 if hasattr(e, "pos"):
                     position = e.pos
                 raise InvalidJSONError(json_error=str(e), position=position) from e
-        elif isinstance(adf, dict):
-            adf_dict = adf
+            adf_dict = self._validate_adf_object(raw_adf)
         else:
-            raise InvalidInputError(
-                expected_type="str, dict, or None",
-                actual_type=type(adf).__name__,
-            )
+            adf_dict = self._validate_adf_object(adf_value)
 
         # Create node from the dict
         self._root_node = nodes.create_node_from_dict(adf_dict)
+
+    @staticmethod
+    def _validate_adf_object(value: object) -> JSONObject:
+        if not isinstance(value, dict):
+            raise InvalidInputError(
+                expected_type="JSON object, dict, or None",
+                actual_type=type(value).__name__,
+            )
+
+        return cast(JSONObject, value)
 
     def to_markdown(self, config: MarkdownConfig | None = None) -> str:
         """

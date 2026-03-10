@@ -1,9 +1,10 @@
 """ADF node models with type-safe representations."""
 
 import enum
-from typing import Optional
+from typing import Final, TypeGuard, cast
 
 from ._logger import get_logger
+from ._types import JSONObject, JSONValue, MarkDict
 from .exceptions import (
     InvalidFieldError,
     MissingFieldError,
@@ -56,11 +57,7 @@ class NodeType(enum.Enum):
         Raises:
             InvalidFieldError: If the string doesn't match any known node type
         """
-        # Use a closure-based cache to avoid enum member conflicts
-        if not hasattr(cls, "_cache"):
-            cls._cache = {e.value[1]: e for e in cls}
-
-        node_type = cls._cache.get(s)
+        node_type = _NODE_TYPE_LOOKUP.get(s)
         if node_type is None:
             raise InvalidFieldError(
                 field_name="type",
@@ -75,10 +72,81 @@ class NodeType(enum.Enum):
         return [e.value[1] for e in cls]
 
 
+_NODE_TYPE_LOOKUP: Final[dict[str, NodeType]] = {
+    str(node_type): node_type for node_type in NodeType
+}
+
+
+def _is_json_object(value: JSONValue) -> TypeGuard[JSONObject]:
+    return isinstance(value, dict)
+
+
+def _is_json_object_list(value: JSONValue) -> TypeGuard[list[JSONObject]]:
+    return isinstance(value, list) and all(isinstance(item, dict) for item in value)
+
+
+def _require_node_type(node_dict: JSONObject, node_path: str) -> str:
+    if "type" not in node_dict:
+        raise MissingFieldError(
+            field_name="type",
+            node_path=node_path or "<root>",
+            expected_values=NodeType.supported_values(),
+        )
+
+    node_type = node_dict["type"]
+    if not isinstance(node_type, str):
+        raise InvalidFieldError(
+            field_name="type",
+            invalid_value=repr(node_type),
+            node_path=node_path or "<root>",
+            expected_values=NodeType.supported_values(),
+        )
+
+    return node_type
+
+
+def _get_attrs(node_dict: JSONObject) -> JSONObject:
+    attrs = node_dict.get("attrs")
+    if attrs is None:
+        return {}
+    if _is_json_object(attrs):
+        return attrs
+    return {}
+
+
+def _get_content(node_dict: JSONObject) -> list[JSONObject]:
+    content = node_dict.get("content")
+    if content is None:
+        return []
+    if _is_json_object_list(content):
+        return content
+    return []
+
+
+def _get_marks(node_dict: JSONObject) -> list[MarkDict]:
+    marks = node_dict.get("marks")
+    if not isinstance(marks, list):
+        return []
+
+    valid_marks: list[MarkDict] = []
+    for mark in marks:
+        if isinstance(mark, dict):
+            valid_marks.append(cast(MarkDict, mark))
+    return valid_marks
+
+
+def _get_str_value(value: JSONValue | None) -> str | None:
+    return value if isinstance(value, str) else None
+
+
+def _get_int_value(value: JSONValue | None) -> int | None:
+    return value if type(value) is int else None
+
+
 class Node:
     """Base class for all ADF nodes."""
 
-    def __init__(self, node_dict: dict, node_path: str = "") -> None:
+    def __init__(self, node_dict: JSONObject, node_path: str = "") -> None:
         """
         Initialize a node from dictionary.
 
@@ -90,14 +158,7 @@ class Node:
             MissingFieldError: If required 'type' field is missing
             InvalidFieldError: If 'type' field has an invalid value
         """
-        if "type" not in node_dict:
-            raise MissingFieldError(
-                field_name="type",
-                node_path=node_path or "<root>",
-                expected_values=NodeType.supported_values(),
-            )
-
-        self._type_str: str = node_dict["type"]
+        self._type_str = _require_node_type(node_dict, node_path)
         self._node_path: str = node_path
 
         try:
@@ -110,18 +171,15 @@ class Node:
             logger.debug(f"Unknown node type '{self._type_str}' at {node_path}")
 
         self._type: NodeType = n_type
-        self._attrs: dict = node_dict.get("attrs", {})
-        self._content: list = (
-            node_dict["content"] if ("content" in node_dict) and (node_dict["content"]) else []
-        )
+        self._attrs: JSONObject = _get_attrs(node_dict)
+        self._content: list[JSONObject] = _get_content(node_dict)
 
         self._child_nodes: list[Node] = []
         for idx, child_node in enumerate(self._content):
             child_path = f"{node_path} > {self._type_str}[{idx}]" if node_path else self._type_str
             try:
                 child = create_node_from_dict(child_node, child_path)
-                if child is not None:
-                    self._child_nodes.append(child)
+                self._child_nodes.append(child)
             except (MissingFieldError, InvalidFieldError, UnsupportedNodeTypeError):
                 # Re-raise validation errors with proper context
                 raise
@@ -140,6 +198,17 @@ class Node:
         """Get child nodes."""
         return self._child_nodes
 
+    def _get_attr_str(self, key: str) -> str | None:
+        return _get_str_value(self._attrs.get(key))
+
+    def _get_attr_str_or_default(self, key: str, default: str) -> str:
+        value = self._get_attr_str(key)
+        return default if value is None else value
+
+    def _get_attr_int(self, key: str, default: int) -> int:
+        value = _get_int_value(self._attrs.get(key))
+        return default if value is None else value
+
 
 class DocNode(Node):
     """Represents a document root node."""
@@ -156,16 +225,17 @@ class ParagraphNode(Node):
 class TextNode(Node):
     """Represents a text node with optional formatting marks."""
 
-    def __init__(self, node_dict: dict, node_path: str = "") -> None:
+    def __init__(self, node_dict: JSONObject, node_path: str = "") -> None:
         super().__init__(node_dict, node_path)
 
-        if "text" not in node_dict:
+        text = _get_str_value(node_dict.get("text"))
+        if text is None:
             logger.warning(f"Text field does not exist in TextNode at {node_path or '<root>'}")
             self._text = ""
         else:
-            self._text: str = node_dict["text"]
+            self._text = text
 
-        self._marks: list[dict] = node_dict.get("marks", [])
+        self._marks: list[MarkDict] = _get_marks(node_dict)
 
         # Parse marks for common formatting
         self._is_bold = False
@@ -211,7 +281,7 @@ class HardBreakNode(Node):
 class ListNode(Node):
     """Base class for list nodes (bullet, ordered, task lists)."""
 
-    def __init__(self, node_dict: dict, node_path: str = "") -> None:
+    def __init__(self, node_dict: JSONObject, node_path: str = "") -> None:
         super().__init__(node_dict, node_path)
 
         self._elements: list[Node] = []
@@ -278,7 +348,7 @@ class TableNode(Node):
     """Represents a table."""
 
     @property
-    def header(self) -> Optional["TableRowNode"]:
+    def header(self) -> "TableRowNode | None":
         """Get the table header row if it exists."""
 
         def has_header_cells(node: Node | None) -> bool:
@@ -319,8 +389,7 @@ class TableCellNode(Node):
     @property
     def colspan(self) -> int:
         """Get the column span of this cell."""
-        result = self._attrs.get("colspan", 1)
-        return int(result) if result is not None else 1
+        return self._get_attr_int("colspan", 1)
 
 
 class TableHeaderNode(TableCellNode):
@@ -335,7 +404,7 @@ class CodeBlockNode(Node):
     @property
     def language(self) -> str | None:
         """Get the programming language of the code block."""
-        return self._attrs.get("language")
+        return self._get_attr_str("language")
 
 
 class InlineCardNode(Node):
@@ -344,12 +413,12 @@ class InlineCardNode(Node):
     @property
     def url(self) -> str | None:
         """Get the URL of the inline card."""
-        return self._attrs.get("url")
+        return self._get_attr_str("url")
 
     @property
     def data(self) -> str | None:
         """Get the data of the inline card."""
-        return self._attrs.get("data")
+        return self._get_attr_str("data")
 
 
 class HeadingNode(Node):
@@ -358,7 +427,7 @@ class HeadingNode(Node):
     @property
     def level(self) -> int:
         """Get the heading level (1-6)."""
-        return self._attrs.get("level", 1)
+        return self._get_attr_int("level", 1)
 
 
 class StatusNode(Node):
@@ -367,12 +436,12 @@ class StatusNode(Node):
     @property
     def status_text(self) -> str:
         """Get the status text."""
-        return self._attrs.get("text", "")
+        return self._get_attr_str_or_default("text", "")
 
     @property
     def color(self) -> str:
         """Get the status color."""
-        return self._attrs.get("color", "")
+        return self._get_attr_str_or_default("color", "")
 
 
 class EmojiNode(Node):
@@ -381,17 +450,17 @@ class EmojiNode(Node):
     @property
     def short_name(self) -> str:
         """Get the emoji short name (e.g., ':grinning:')."""
-        return self._attrs.get("shortName", "")
+        return self._get_attr_str_or_default("shortName", "")
 
     @property
     def emoji_id(self) -> str | None:
         """Get the emoji service ID."""
-        return self._attrs.get("id")
+        return self._get_attr_str("id")
 
     @property
     def text(self) -> str | None:
         """Get the text representation of the emoji (unicode character)."""
-        return self._attrs.get("text")
+        return self._get_attr_str("text")
 
 
 class MentionNode(Node):
@@ -399,11 +468,11 @@ class MentionNode(Node):
 
     @property
     def id(self) -> str | None:
-        return self._attrs.get("id")
+        return self._get_attr_str("id")
 
     @property
     def text(self) -> str | None:
-        return self._attrs.get("text")
+        return self._get_attr_str("text")
 
 
 # Node registry for factory pattern
@@ -444,7 +513,7 @@ _KNOWN_UNSUPPORTED_TYPES = {
 }
 
 
-def create_node_from_dict(node_dict: dict, node_path: str = "") -> Node | None:
+def create_node_from_dict(node_dict: JSONObject, node_path: str = "") -> Node:
     """
     Create a node from a dictionary using registry pattern.
 
@@ -460,14 +529,7 @@ def create_node_from_dict(node_dict: dict, node_path: str = "") -> Node | None:
         MissingFieldError: If required fields are missing
         NodeCreationError: If node creation fails
     """
-    if "type" not in node_dict:
-        raise MissingFieldError(
-            field_name="type",
-            node_path=node_path or "<root>",
-            expected_values=NodeType.supported_values(),
-        )
-
-    node_type_str = node_dict["type"]
+    node_type_str = _require_node_type(node_dict, node_path)
     current_path = f"{node_path} > {node_type_str}" if node_path else node_type_str
 
     # Handle known unsupported types gracefully
@@ -510,5 +572,3 @@ def create_node_from_dict(node_dict: dict, node_path: str = "") -> Node | None:
             node_path=current_path,
             original_error=e,
         ) from e
-
-

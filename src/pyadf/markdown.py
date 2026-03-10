@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, field
 
+from ._types import BulletMarker
 from .nodes import (
     CodeBlockNode,
     EmojiNode,
@@ -20,7 +21,7 @@ from .nodes import (
 class MarkdownConfig:
     """Configuration options for markdown generation."""
 
-    bullet_marker: str = "+"
+    bullet_marker: BulletMarker = "+"
 
     def __post_init__(self) -> None:
         if self.bullet_marker not in ("+", "-", "*"):
@@ -37,9 +38,7 @@ class RenderContext:
     config: MarkdownConfig = field(default_factory=MarkdownConfig)
 
 
-def gen_md_from_root_node(
-    root_node: Node, config: MarkdownConfig | None = None
-) -> str:
+def gen_md_from_root_node(root_node: Node, config: MarkdownConfig | None = None) -> str:
     """
     Generate markdown from a root ADF node.
 
@@ -59,10 +58,6 @@ def gen_md_from_root_node(
     root_node_presenter = create_node_presenter_from_node(
         root_node, RenderContext(is_first=True, config=config)
     )
-
-    if root_node_presenter is None:
-        return ""
-
     return str(root_node_presenter)
 
 
@@ -128,11 +123,15 @@ class ParagraphPresenter(NodePresenter):
         if context is None:
             return False
 
+        parent_is_list_item = (
+            context.parent_node is not None and context.parent_node.type == NodeType.LIST_ITEM
+        )
+
         return (
             context.parent_node is None
             or context.is_first
             or context.is_prev_hard_break
-            or (context.parent_node and context.parent_node.type == NodeType.LIST_ITEM)
+            or parent_is_list_item
         )
 
     def __str__(self) -> str:
@@ -208,7 +207,7 @@ class PanelPresenter(NodePresenter):
     """Presenter for panel nodes."""
 
     def __str__(self) -> str:
-        out_lines = []
+        out_lines: list[str] = []
         for child_presenter in self._child_presenters:
             cur_presenter_lines = str(child_presenter).splitlines()
             for line in cur_presenter_lines:
@@ -221,7 +220,7 @@ class BlockquotePresenter(NodePresenter):
     """Presenter for blockquote nodes."""
 
     def __str__(self) -> str:
-        out_lines = []
+        out_lines: list[str] = []
         for child_presenter in self._child_presenters:
             cur_presenter_str = str(child_presenter)
             # Strip leading/trailing whitespace and split into lines
@@ -237,14 +236,13 @@ class TablePresenter(NodePresenter):
     """Presenter for table nodes."""
 
     def __str__(self) -> str:
-        row_list = []
+        row_list: list[str] = []
         for row_presenter in self._child_presenters:
             row_list.append(str(row_presenter))
 
             # Check if this row is a header row
             is_header = any(
-                child.node.type == NodeType.TABLE_HEADER
-                for child in row_presenter.child_presenters
+                child.node.type == NodeType.TABLE_HEADER for child in row_presenter.child_presenters
             )
 
             if is_header and isinstance(row_presenter, TableRowPresenter):
@@ -370,7 +368,7 @@ class MentionPresenter(NodePresenter):
         self._mention_node = node
 
     def __str__(self) -> str:
-        return self._mention_node.text
+        return self._mention_node.text or ""
 
 
 # Presenter registry for factory pattern
@@ -401,7 +399,7 @@ _PRESENTER_REGISTRY: dict[NodeType, type[NodePresenter]] = {
 
 def create_node_presenter_from_node(
     node: Node, context: RenderContext | None = None
-) -> NodePresenter | None:
+) -> NodePresenter:
     """
     Create a presenter for a node using registry pattern.
 
@@ -410,7 +408,7 @@ def create_node_presenter_from_node(
         context: Rendering context
 
     Returns:
-        NodePresenter instance or None if node type is unsupported
+        NodePresenter instance
     """
     presenter_class = _PRESENTER_REGISTRY.get(node.type)
 

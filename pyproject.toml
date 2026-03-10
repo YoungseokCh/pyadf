@@ -23,6 +23,9 @@ classifiers = [
 ]
 keywords = ["adf", "markdown", "atlassian", "converter", "confluence", "jira"]
 
+[project.optional-dependencies]
+dev = ["pytest>=7.0", "mypy>=1.0", "pyright>=1.1"]
+
 [project.urls]
 Homepage = "https://github.com/YoungseokCh/pyadf"
 Repository = "https://github.com/YoungseokCh/pyadf"
@@ -38,6 +41,10 @@ warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
 check_untyped_defs = true
+
+[tool.pyright]
+pythonVersion = "3.11"
+typeCheckingMode = "basic"
 
 [tool.ruff]
 line-length = 100

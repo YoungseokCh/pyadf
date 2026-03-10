@@ -105,33 +105,44 @@ def _require_node_type(node_dict: JSONObject, node_path: str) -> str:
     return node_type
 
 
-def _get_attrs(node_dict: JSONObject) -> JSONObject:
+def _invalid_field_error(field_name: str, value: JSONValue, node_path: str) -> InvalidFieldError:
+    return InvalidFieldError(
+        field_name=field_name,
+        invalid_value=repr(value),
+        node_path=node_path or "<root>",
+    )
+
+
+def _get_attrs(node_dict: JSONObject, node_path: str) -> JSONObject:
     attrs = node_dict.get("attrs")
     if attrs is None:
         return {}
     if _is_json_object(attrs):
         return attrs
-    return {}
+    raise _invalid_field_error("attrs", attrs, node_path)
 
 
-def _get_content(node_dict: JSONObject) -> list[JSONObject]:
+def _get_content(node_dict: JSONObject, node_path: str) -> list[JSONObject]:
     content = node_dict.get("content")
     if content is None:
         return []
     if _is_json_object_list(content):
         return content
-    return []
+    raise _invalid_field_error("content", content, node_path)
 
 
-def _get_marks(node_dict: JSONObject) -> list[MarkDict]:
+def _get_marks(node_dict: JSONObject, node_path: str) -> list[MarkDict]:
     marks = node_dict.get("marks")
-    if not isinstance(marks, list):
+    if marks is None:
         return []
+    if not isinstance(marks, list):
+        raise _invalid_field_error("marks", marks, node_path)
 
     valid_marks: list[MarkDict] = []
     for mark in marks:
-        if isinstance(mark, dict):
-            valid_marks.append(cast(MarkDict, mark))
+        if not isinstance(mark, dict):
+            raise _invalid_field_error("marks", marks, node_path)
+        valid_marks.append(cast(MarkDict, mark))
     return valid_marks
 
 
@@ -171,8 +182,8 @@ class Node:
             logger.debug(f"Unknown node type '{self._type_str}' at {node_path}")
 
         self._type: NodeType = n_type
-        self._attrs: JSONObject = _get_attrs(node_dict)
-        self._content: list[JSONObject] = _get_content(node_dict)
+        self._attrs: JSONObject = _get_attrs(node_dict, node_path)
+        self._content: list[JSONObject] = _get_content(node_dict, node_path)
 
         self._child_nodes: list[Node] = []
         for idx, child_node in enumerate(self._content):
@@ -235,7 +246,7 @@ class TextNode(Node):
         else:
             self._text = text
 
-        self._marks: list[MarkDict] = _get_marks(node_dict)
+        self._marks: list[MarkDict] = _get_marks(node_dict, node_path)
 
         # Parse marks for common formatting
         self._is_bold = False

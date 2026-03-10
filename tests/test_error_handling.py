@@ -171,6 +171,74 @@ class TestErrorMessageQuality:
         assert '"doc"' in error_str or '"paragraph"' in error_str
 
 
+class TestMalformedFieldErrors:
+    """Test malformed nested field shapes."""
+
+    def test_invalid_nested_content_field(self):
+        """Test invalid nested content raises a validation error."""
+        with pytest.raises(InvalidFieldError) as exc_info:
+            Document(
+                {
+                    "type": "doc",
+                    "content": [
+                        {
+                            "type": "paragraph",
+                            "content": ["oops"],
+                        }
+                    ],
+                }
+            )
+
+        error = exc_info.value
+        assert 'field "content"' in str(error)
+        assert "at:" in str(error)
+
+    def test_invalid_nested_attrs_field(self):
+        """Test invalid nested attrs raises a validation error."""
+        with pytest.raises(InvalidFieldError) as exc_info:
+            Document(
+                {
+                    "type": "doc",
+                    "content": [
+                        {
+                            "type": "heading",
+                            "attrs": "oops",
+                            "content": [{"type": "text", "text": "Title"}],
+                        }
+                    ],
+                }
+            )
+
+        error = exc_info.value
+        assert 'field "attrs"' in str(error)
+        assert "at:" in str(error)
+
+    def test_invalid_nested_marks_field(self):
+        """Test invalid nested marks raises a validation error."""
+        with pytest.raises(InvalidFieldError) as exc_info:
+            Document(
+                {
+                    "type": "doc",
+                    "content": [
+                        {
+                            "type": "paragraph",
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": "Hello",
+                                    "marks": ["strong"],
+                                }
+                            ],
+                        }
+                    ],
+                }
+            )
+
+        error = exc_info.value
+        assert 'field "marks"' in str(error)
+        assert "at:" in str(error)
+
+
 class TestValidData:
     """Test that valid data doesn't raise errors."""
 

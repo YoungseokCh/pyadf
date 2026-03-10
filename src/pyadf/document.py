@@ -48,12 +48,12 @@ class Document:
             # Empty document
             return
 
-        adf_value: object = adf
+        raw_adf_input = cast(object, adf)
 
         # Handle string input (JSON)
-        if isinstance(adf_value, str):
+        if isinstance(raw_adf_input, str):
             try:
-                raw_adf: object = json.loads(adf_value)
+                raw_adf: object = json.loads(raw_adf_input)
             except json.JSONDecodeError as e:
                 # Extract position from error message if available
                 position = None
@@ -61,8 +61,13 @@ class Document:
                     position = e.pos
                 raise InvalidJSONError(json_error=str(e), position=position) from e
             adf_dict = self._validate_adf_object(raw_adf)
+        elif isinstance(raw_adf_input, dict):
+            adf_dict = self._validate_adf_object(cast(object, raw_adf_input))
         else:
-            adf_dict = self._validate_adf_object(adf_value)
+            raise InvalidInputError(
+                expected_type="str, dict, or None",
+                actual_type=type(raw_adf_input).__name__,
+            )
 
         # Create node from the dict
         self._root_node = nodes.create_node_from_dict(adf_dict)

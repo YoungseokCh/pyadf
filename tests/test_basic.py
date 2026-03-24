@@ -60,6 +60,24 @@ class TestSimpleConversions:
         result = Document(adf_data).to_markdown()
         assert result == "***Hello!***"
 
+    def test_text_with_link(self):
+        """Test converting text with a link."""
+        adf_data = {
+            "type": "paragraph",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "This is a link",
+                    "marks": [{'type': 'link', 'attrs': {'href': 'http://example.com/'}}],
+                }
+            ],
+        }
+        result = Document(adf_data).to_markdown()
+        assert result == "[This is a link]"
+
+        config = MarkdownConfig(show_links=True)
+        result = Document(adf_data).to_markdown(config)
+        assert result == "[This is a link](http://example.com/)"
 
 class TestHeadings:
     """Test heading conversions."""

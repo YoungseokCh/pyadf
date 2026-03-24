@@ -22,6 +22,7 @@ class MarkdownConfig:
     """Configuration options for markdown generation."""
 
     bullet_marker: BulletMarker = "+"
+    show_links: bool = False
 
     def __post_init__(self) -> None:
         if self.bullet_marker not in ("+", "-", "*"):
@@ -160,6 +161,8 @@ class TextPresenter(NodePresenter):
 
         if self._text_node.is_link:
             out = f"[{out}]"
+            if self._context.config.show_links and self._text_node.link:
+                out = f"{out}({self._text_node.link})"
 
         return out
 

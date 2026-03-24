@@ -137,6 +137,10 @@ doc.to_markdown(config)  # "* Item 1\n* Item 2"
 # Use - for bullet lists
 config = MarkdownConfig(bullet_marker="-")
 doc.to_markdown(config)  # "- Item 1\n- Item 2"
+
+# Show links with both display text and underlying href
+config = MarkdownConfig(show_links=True)
+doc.to_markdown(config)  # [Link text](http://example.com)
 ```
 
 Available options:
@@ -144,6 +148,7 @@ Available options:
 | Option | Values | Default | Description |
 |--------|--------|---------|-------------|
 | `bullet_marker` | `+`, `-`, `*` | `+` | Character used for bullet list items |
+| `show_links` | `True`, `False` | `False` | Show underlying links in markdown |
 
 ## Supported ADF Node Types
 
@@ -206,7 +211,11 @@ MIT License - see LICENSE file for details
 
 ## Changelog
 
-### 0.3.1 (Current)
+### 0.3.2 (Current)
+
+- Added support for showing href links in markdown output
+
+### 0.3.1
 
 - Added mention node support
 

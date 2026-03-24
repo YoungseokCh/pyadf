@@ -13,6 +13,7 @@ class MarkDict(TypedDict, total=False):
     """Supported text mark fields used by this library."""
 
     type: str
+    attrs: JSONObject
 
 
 class ADFNodeDict(TypedDict):

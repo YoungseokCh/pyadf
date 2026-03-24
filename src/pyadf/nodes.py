@@ -246,6 +246,7 @@ class TextNode(Node):
         else:
             self._text = text
 
+        self.link: str = ""
         self._marks: list[MarkDict] = _get_marks(node_dict, node_path)
 
         # Parse marks for common formatting
@@ -261,6 +262,9 @@ class TextNode(Node):
                 self._is_italic = True
             elif mark_type == "link":
                 self._is_link = True
+                attrs = mark.get("attrs")
+                if attrs is not None:
+                    self.link = str(attrs.get("href", ""))
 
     @property
     def text(self) -> str:

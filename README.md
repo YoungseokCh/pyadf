@@ -187,17 +187,6 @@ doc.to_markdown(config)  # [Link text](http://example.com)
 
 All exceptions include detailed context about the error location in the ADF tree.
 
-## Performance
-
-Benchmarked against pyadf v0.3.1 (pure Python) on realistic ADF documents:
-
-| Mode | v0.3.1 | v0.4.0 | Speedup |
-|------|--------|--------|---------|
-| Single doc (`Document` class) | 34K docs/s | 177K docs/s | **5.2x** |
-| JSONL batch (`convert_jsonl`) | 34K docs/s | 797K docs/s | **23.7x** |
-
-Run `python -m benchmarks` to reproduce.
-
 ## Development
 
 ### Prerequisites
@@ -234,18 +223,15 @@ ruff check src/ tests/ benchmarks/
 ruff format --check src/ tests/ benchmarks/
 ```
 
-### Benchmarks
-
-```bash
-uv run maturin develop --release
-uv run python -m benchmarks
-```
-
 ## License
 
 MIT License — see LICENSE file for details.
 
 ## Changelog
+
+### 0.4.1
+
+- Fix linux x86_64 wheel builds
 
 ### 0.4.0 (Current)
 

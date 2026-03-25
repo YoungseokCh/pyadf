@@ -1,9 +1,7 @@
 """Document class for ADF to Markdown conversion."""
 
-import json
-
-from . import markdown, nodes
-from .exceptions import InvalidInputError, InvalidJSONError
+from . import _core
+from .exceptions import InvalidInputError
 from .markdown import MarkdownConfig
 
 
@@ -12,6 +10,9 @@ class Document:
     Document class for handling Atlassian Document Format (ADF).
 
     This class provides a clean interface for converting ADF to Markdown.
+    ADF input is parsed and validated eagerly at construction time (input
+    errors surface here). Rendering from the cached tree in to_markdown()
+    cannot fail due to bad input.
 
     Example:
         >>> doc = Document('{"type": "doc", "content": [...]}')
@@ -28,6 +29,10 @@ class Document:
         """
         Initialize a Document from ADF data.
 
+        Parses and validates the ADF structure eagerly. All input-related
+        errors (bad JSON, missing fields, unsupported node types) are raised
+        here so that to_markdown() only performs rendering.
+
         Args:
             adf: ADF data as a JSON string, dict, or None for empty document.
                  Can be any ADF node type including "doc".
@@ -40,36 +45,26 @@ class Document:
             InvalidFieldError: If fields have invalid values
             NodeCreationError: If node creation fails
         """
-        self._root_node: nodes.Node | None = None
+        self._parsed: _core.ParsedAdf | None = None
 
         if adf is None:
-            # Empty document
             return
 
-        # Handle string input (JSON)
         if isinstance(adf, str):
-            try:
-                adf_dict = json.loads(adf)
-            except json.JSONDecodeError as e:
-                # Extract position from error message if available
-                position = None
-                if hasattr(e, "pos"):
-                    position = e.pos
-                raise InvalidJSONError(json_error=str(e), position=position) from e
+            self._parsed = _core.parse_adf_str(adf)
         elif isinstance(adf, dict):
-            adf_dict = adf
+            self._parsed = _core.parse_adf_dict(adf)
         else:
             raise InvalidInputError(
                 expected_type="str, dict, or None",
                 actual_type=type(adf).__name__,
             )
 
-        # Create node from the dict
-        self._root_node = nodes.create_node_from_dict(adf_dict)
-
     def to_markdown(self, config: MarkdownConfig | None = None) -> str:
         """
         Convert the ADF document to Markdown.
+
+        Renders from the pre-parsed tree cached at construction time.
 
         Args:
             config: Optional markdown configuration options
@@ -78,7 +73,11 @@ class Document:
             Markdown representation of the ADF content. Returns empty string
             if the document is empty or if the root node is None.
         """
-        if self._root_node is None:
+        if self._parsed is None:
             return ""
 
-        return markdown.gen_md_from_root_node(self._root_node, config)
+        rust_config = None
+        if config is not None:
+            rust_config = _core.MarkdownConfig(config.bullet_marker, config.show_links)
+
+        return _core.render_markdown(self._parsed, rust_config)

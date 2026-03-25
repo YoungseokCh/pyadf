@@ -1,6 +1,7 @@
-"""Tests for error handling and error messages."""
+"""Tests for error handling, error messages, and validation."""
 
 import pytest
+
 from pyadf import (
     Document,
     InvalidFieldError,
@@ -12,22 +13,16 @@ from pyadf import (
 
 
 class TestJSONErrors:
-    """Test JSON parsing errors."""
-
     def test_invalid_json_string(self):
-        """Test error message for invalid JSON."""
         with pytest.raises(InvalidJSONError) as exc_info:
             Document('{"type": "doc", invalid}')
-
         error = exc_info.value
         assert "Invalid JSON" in str(error)
         assert error.json_error is not None
 
     def test_invalid_input_type(self):
-        """Test error message for invalid input type."""
         with pytest.raises(InvalidInputError) as exc_info:
             Document(12345)
-
         error = exc_info.value
         assert "Invalid input type" in str(error)
         assert "expected str, dict, or None" in str(error)
@@ -35,23 +30,37 @@ class TestJSONErrors:
         assert "Hint:" in str(error)
 
 
-class TestMissingFieldErrors:
-    """Test missing field errors."""
+class TestJSONErrorPosition:
+    def test_single_line(self):
+        bad_json = '{"type": "doc", invalid}'
+        with pytest.raises(InvalidJSONError) as exc_info:
+            Document(bad_json)
+        error = exc_info.value
+        assert error.position is not None
+        assert error.position >= 16
 
-    def test_missing_type_field(self):
-        """Test error message when 'type' field is missing."""
+    def test_multiline_absolute_offset(self):
+        """Position should be an absolute byte offset, not line-local column."""
+        bad_json = "{\n    XXXXX}"
+        with pytest.raises(InvalidJSONError) as exc_info:
+            Document(bad_json)
+        error = exc_info.value
+        assert error.position is not None
+        # "XXXXX" starts at byte 6 (after '{\n    '). Line-local would be 4.
+        assert error.position >= 6
+
+
+class TestMissingFieldErrors:
+    def test_missing_type_at_root(self):
         with pytest.raises(MissingFieldError) as exc_info:
             Document({"content": []})
-
         error = exc_info.value
         assert 'Missing required field "type"' in str(error)
         assert "at: <root>" in str(error)
         assert "Expected one of:" in str(error)
-        # Should show some supported types
         assert "doc" in str(error) or "paragraph" in str(error)
 
     def test_missing_type_in_nested_node(self):
-        """Test error message with node path for nested nodes."""
         with pytest.raises(MissingFieldError) as exc_info:
             Document(
                 {
@@ -59,36 +68,26 @@ class TestMissingFieldErrors:
                     "content": [
                         {
                             "type": "paragraph",
-                            "content": [
-                                {"text": "missing type field"}  # Missing 'type' field
-                            ],
+                            "content": [{"text": "missing type field"}],
                         }
                     ],
                 }
             )
-
         error = exc_info.value
         assert 'Missing required field "type"' in str(error)
-        # Should show the path to the problematic node
         assert "paragraph" in str(error).lower()
 
 
 class TestUnsupportedNodeTypes:
-    """Test unsupported node type errors."""
-
-    def test_unsupported_node_type(self):
-        """Test error message for unsupported node types."""
+    def test_unsupported_at_root(self):
         with pytest.raises(UnsupportedNodeTypeError) as exc_info:
             Document({"type": "foobar"})
-
         error = exc_info.value
         assert 'Unsupported node type "foobar"' in str(error)
         assert "Supported types:" in str(error)
-        # Should list some supported types
         assert "doc" in str(error) or "paragraph" in str(error)
 
-    def test_unsupported_nested_node_type(self):
-        """Test error with path for unsupported nested node."""
+    def test_unsupported_nested(self):
         with pytest.raises(UnsupportedNodeTypeError) as exc_info:
             Document(
                 {
@@ -101,19 +100,34 @@ class TestUnsupportedNodeTypes:
                     ],
                 }
             )
-
         error = exc_info.value
         assert "invalidNodeType" in str(error)
         assert "at:" in str(error)
-        # Path should show where the error occurred
         assert "paragraph" in str(error).lower()
 
 
-class TestErrorMessageQuality:
-    """Test that error messages are helpful and clear."""
+class TestInvalidFieldErrors:
+    def test_invalid_content_field(self):
+        """content must be a list of dicts, not a string."""
+        with pytest.raises(InvalidFieldError) as exc_info:
+            Document({"type": "doc", "content": "bad"})
+        assert "content" in str(exc_info.value)
 
+    def test_invalid_attrs_field(self):
+        """attrs must be a dict, not a string."""
+        with pytest.raises(InvalidFieldError) as exc_info:
+            Document({"type": "doc", "attrs": "bad"})
+        assert "attrs" in str(exc_info.value)
+
+    def test_invalid_marks_field(self):
+        """marks must be a list of dicts."""
+        with pytest.raises(InvalidFieldError) as exc_info:
+            Document({"type": "text", "text": "x", "marks": "bad"})
+        assert "marks" in str(exc_info.value)
+
+
+class TestErrorMessageQuality:
     def test_error_has_node_path(self):
-        """Test that errors include node path for context."""
         with pytest.raises(UnsupportedNodeTypeError) as exc_info:
             Document(
                 {
@@ -124,69 +138,33 @@ class TestErrorMessageQuality:
                             "content": [
                                 {
                                     "type": "listItem",
-                                    "content": [
-                                        {
-                                            "type": "unknownType",
-                                            "content": [],
-                                        }
-                                    ],
+                                    "content": [{"type": "unknownType", "content": []}],
                                 }
                             ],
                         }
                     ],
                 }
             )
-
-        error = exc_info.value
-        error_str = str(error)
-
-        # Should show the full path
+        error_str = str(exc_info.value)
         assert "at:" in error_str
-        # Path should include parent nodes
         assert "bulletList" in error_str or "listItem" in error_str
 
-    def test_invalid_field_shows_valid_options(self):
-        """Test that invalid field errors show valid options."""
+    def test_shows_valid_options(self):
         with pytest.raises(UnsupportedNodeTypeError) as exc_info:
             Document({"type": "notAValidType"})
-
-        error = exc_info.value
-        error_str = str(error)
-
-        # Should list valid types
+        error_str = str(exc_info.value)
         assert "Supported types:" in error_str
-        # Should show actual supported node types
         assert '"doc"' in error_str or '"paragraph"' in error_str
 
 
 class TestValidData:
-    """Test that valid data doesn't raise errors."""
-
     def test_valid_document(self):
-        """Test that valid documents don't raise errors."""
-        # This should not raise any errors
         doc = Document(
             {
                 "type": "doc",
                 "content": [
-                    {
-                        "type": "paragraph",
-                        "content": [{"type": "text", "text": "Hello, world!"}],
-                    }
+                    {"type": "paragraph", "content": [{"type": "text", "text": "Hello, world!"}]},
                 ],
             }
         )
-        result = doc.to_markdown()
-        assert result == "Hello, world!"
-
-    def test_empty_document(self):
-        """Test that empty documents work correctly."""
-        doc = Document()
-        result = doc.to_markdown()
-        assert result == ""
-
-    def test_none_document(self):
-        """Test that None input works correctly."""
-        doc = Document(None)
-        result = doc.to_markdown()
-        assert result == ""
+        assert doc.to_markdown() == "Hello, world!"

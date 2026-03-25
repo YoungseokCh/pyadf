@@ -1,7 +1,6 @@
 """Exception classes for pyadf with detailed error context."""
 
 
-
 class PyADFError(Exception):
     """Base exception for all pyadf errors."""
 

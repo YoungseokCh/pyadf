@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
+requires = ["maturin>=1.7,<2"]
+build-backend = "maturin"
 
 [project]
 name = "pyadf"
-version = "0.3.2"
+version = "0.4.0"
 description = "A Python library for converting Atlassian Document Format (ADF) to Markdown"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -19,18 +19,24 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Rust",
     "Topic :: Text Processing :: Markup",
 ]
 keywords = ["adf", "markdown", "atlassian", "converter", "confluence", "jira"]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0", "mypy>=1.0", "pyright>=1.1"]
 
 [project.urls]
 Homepage = "https://github.com/YoungseokCh/pyadf"
 Repository = "https://github.com/YoungseokCh/pyadf"
 Issues = "https://github.com/YoungseokCh/pyadf/issues"
 
-[tool.setuptools.packages.find]
-where = ["src"]
-include = ["pyadf*"]
+[tool.maturin]
+features = ["pyo3/extension-module", "pyo3/abi3-py311"]
+module-name = "pyadf._core"
+manifest-path = "Cargo.toml"
+python-source = "src"
 
 [tool.mypy]
 python_version = "3.11"

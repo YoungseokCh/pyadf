@@ -1,13 +1,15 @@
 # pyadf
 
-![](https://img.shields.io/badge/Python-3776AB?style=flat&logo=python&logoColor=white) ![](https://img.shields.io/pypi/v/pyadf)
+![](https://img.shields.io/badge/Python-3776AB?style=flat&logo=python&logoColor=white) ![](https://img.shields.io/badge/Rust-000000?style=flat&logo=rust&logoColor=white) ![](https://img.shields.io/pypi/v/pyadf)
 
-A Python library for converting [Atlassian Document Format (ADF)](https://developer.atlassian.com/cloud/jira/platform/apis/document/structure/) to Markdown.
+A high-performance Python library for converting [Atlassian Document Format (ADF)](https://developer.atlassian.com/cloud/jira/platform/apis/document/structure/) to Markdown, powered by a Rust core.
 
 ## Features
 
-- **Class-based API** for clean, object-oriented usage
-- **Flexible input** - accepts JSON strings, dictionaries, or any ADF node type
+- **Rust-powered** — parsing and rendering run in native code via PyO3
+- **Streaming JSONL API** for ETL pipelines processing millions of documents
+- **Same `Document` class API** — drop-in upgrade for most users (see changelog for breaking changes)
+- **Flexible input** — accepts JSON strings, dictionaries, or any ADF node type
 - **Comprehensive node support**:
   - Text formatting (bold, italic, links)
   - Headings (h1-h6)
@@ -15,20 +17,18 @@ A Python library for converting [Atlassian Document Format (ADF)](https://develo
   - Tables with headers and column spans
   - Code blocks with syntax highlighting
   - Blockquotes and panels
-  - Status badges
-  - Inline cards
-  - Emoji (unicode and shortName)
-  - Mentions
+  - Status badges, inline cards, emoji, mentions
 - **Type-safe** with comprehensive type hints and Python 3.11+ support
-- **Extensible architecture** with registry pattern for custom node types
+- **Eager validation** — ADF structure errors surface at construction time, not render time
 - **Robust error handling** with detailed, context-aware error messages
-- **Debug mode** for troubleshooting and development
 
 ## Installation
 
 ```bash
 pip install pyadf
 ```
+
+Prebuilt wheels are available for Linux and macOS (x86_64 and aarch64) and Windows (x86_64).
 
 ## Usage
 
@@ -37,7 +37,6 @@ pip install pyadf
 ```python
 from pyadf import Document
 
-# Convert ADF document to markdown
 adf_data = {
     "type": "doc",
     "content": [
@@ -52,8 +51,7 @@ adf_data = {
 }
 
 doc = Document(adf_data)
-markdown_text = doc.to_markdown()
-print(markdown_text)
+print(doc.to_markdown())
 # Output: Hello, **world!**
 ```
 
@@ -62,7 +60,6 @@ print(markdown_text)
 ```python
 from pyadf import Document
 
-# Convert from JSON string
 adf_json = '{"type": "doc", "content": [...]}'
 doc = Document(adf_json)
 markdown = doc.to_markdown()
@@ -73,24 +70,50 @@ markdown = doc.to_markdown()
 ```python
 from pyadf import Document
 
-# Convert a single node (any ADF node type)
 node = {
     "type": "heading",
     "attrs": {"level": 2},
-    "content": [
-        {"type": "text", "text": "My Heading"}
-    ]
+    "content": [{"type": "text", "text": "My Heading"}]
 }
 
 doc = Document(node)
-markdown = doc.to_markdown()
-print(markdown)
+print(doc.to_markdown())
 # Output: ## My Heading
 ```
 
-### Error Handling
+### Batch JSONL Processing
 
-The library provides detailed error handling with specific exceptions:
+For ETL pipelines processing large volumes of ADF documents:
+
+```python
+from pyadf import convert_jsonl, MarkdownConfig
+
+# From a JSONL file (one ADF document per line)
+for result in convert_jsonl("export.jsonl"):
+    print(result)
+
+# From bytes with custom config
+config = MarkdownConfig(bullet_marker="*", show_links=True)
+for result in convert_jsonl(jsonl_bytes, config=config, batch_size=10_000):
+    print(result)
+
+# Error handling modes
+from pyadf import ConversionError
+
+for result in convert_jsonl(data, on_error="include"):
+    if isinstance(result, ConversionError):
+        print(f"Line {result.line_number}: {result.error}")
+    else:
+        print(result)
+```
+
+`convert_jsonl` accepts:
+- **`source`**: file path (`str`), raw bytes, or a binary file-like object
+- **`config`**: optional `MarkdownConfig`
+- **`on_error`**: `"include"` (default, yields `ConversionError`), `"skip"`, or `"raise"`
+- **`batch_size`**: lines per Rust batch (default 10,000)
+
+### Error Handling
 
 ```python
 from pyadf import Document, InvalidJSONError, UnsupportedNodeTypeError
@@ -106,21 +129,7 @@ except UnsupportedNodeTypeError as e:
     print(f"Unsupported node: {e}")
 ```
 
-### Debug Mode
-
-Enable debug mode for detailed logging:
-
-```python
-from pyadf import Document, set_debug_mode
-
-set_debug_mode(True)
-doc = Document(adf_data)
-markdown = doc.to_markdown()
-```
-
 ### Customizing Markdown Output
-
-Use `MarkdownConfig` to customize the generated markdown:
 
 ```python
 from pyadf import Document, MarkdownConfig
@@ -134,16 +143,10 @@ doc.to_markdown()  # "+ Item 1\n+ Item 2"
 config = MarkdownConfig(bullet_marker="*")
 doc.to_markdown(config)  # "* Item 1\n* Item 2"
 
-# Use - for bullet lists
-config = MarkdownConfig(bullet_marker="-")
-doc.to_markdown(config)  # "- Item 1\n- Item 2"
-
 # Show links with both display text and underlying href
 config = MarkdownConfig(show_links=True)
 doc.to_markdown(config)  # [Link text](http://example.com)
 ```
-
-Available options:
 
 | Option | Values | Default | Description |
 |--------|--------|---------|-------------|
@@ -169,49 +172,95 @@ Available options:
 | `inlineCard` | `[link]` or code block | Link previews |
 | `emoji` | Unicode emoji | |
 | `hardBreak` | Line break | |
-| `mention` | `@Jirauser Displayname` | Outputs mentioned Jira user's display name prefixed with an @ |
+| `mention` | `@DisplayName` | Jira user mentions |
 
 ## Exception Types
 
-The library provides specific exceptions for different error scenarios:
-
-- `PyADFError` - Base exception for all pyadf errors
-- `InvalidJSONError` - Raised when JSON parsing fails
-- `InvalidInputError` - Raised when input type is incorrect
-- `InvalidADFError` - Raised when ADF structure is invalid
-- `MissingFieldError` - Raised when required fields are missing
-- `InvalidFieldError` - Raised when field values are invalid
-- `UnsupportedNodeTypeError` - Raised when encountering unsupported node types
-- `NodeCreationError` - Raised when node creation fails
+- `PyADFError` — Base exception for all pyadf errors
+- `InvalidJSONError` — Raised when JSON parsing fails
+- `InvalidInputError` — Raised when input type is incorrect
+- `InvalidADFError` — Raised when ADF structure is invalid
+- `MissingFieldError` — Raised when required fields are missing
+- `InvalidFieldError` — Raised when field values are invalid
+- `UnsupportedNodeTypeError` — Raised when encountering unsupported node types
+- `NodeCreationError` — Raised when node creation fails
 
 All exceptions include detailed context about the error location in the ADF tree.
 
+## Performance
+
+Benchmarked against pyadf v0.3.1 (pure Python) on realistic ADF documents:
+
+| Mode | v0.3.1 | v0.4.0 | Speedup |
+|------|--------|--------|---------|
+| Single doc (`Document` class) | 34K docs/s | 177K docs/s | **5.2x** |
+| JSONL batch (`convert_jsonl`) | 34K docs/s | 797K docs/s | **23.7x** |
+
+Run `python -m benchmarks` to reproduce.
+
 ## Development
 
-### Setting Up Development Environment
+### Prerequisites
+
+- Python 3.11+
+- Rust toolchain (stable)
+- [maturin](https://www.maturin.rs/) (`uv tool install maturin`)
+
+### Setup
 
 ```bash
-# Clone the repository
 git clone https://github.com/YoungseokCh/pyadf.git
 cd pyadf
-
-# Install in development mode
-pip install -e .
+uv sync
+uv run maturin develop
 ```
 
-### Running Tests
+### Testing
 
 ```bash
-pytest
+cargo test              # Rust unit tests
+uv run pytest tests/ -v # Python tests
+```
+
+### Linting
+
+```bash
+# Rust
+cargo fmt --check
+cargo clippy -- -D warnings
+
+# Python
+ruff check src/ tests/ benchmarks/
+ruff format --check src/ tests/ benchmarks/
+```
+
+### Benchmarks
+
+```bash
+uv run maturin develop --release
+uv run python -m benchmarks
 ```
 
 ## License
 
-MIT License - see LICENSE file for details
+MIT License — see LICENSE file for details.
 
 ## Changelog
 
-### 0.3.2 (Current)
+### 0.4.0 (Current)
+
+- Rust core via PyO3 — 5x faster single-doc, 24x faster batch processing
+- New `convert_jsonl()` streaming API for batch JSONL processing
+- New `ConversionError` dataclass for structured batch error handling
+- Build system switched from setuptools to maturin
+- abi3 stable ABI wheels for Linux, macOS (x86_64 + aarch64) and Windows (x86_64)
+
+**Breaking changes:**
+
+- Removed `set_debug_mode()` and `_logger` module (will be replaced with Rust-native tracing in a future release)
+- `nodes` and `_types` modules removed (internal implementation replaced by Rust)
+
+### 0.3.2
 
 - Added support for showing href links in markdown output
 
@@ -227,9 +276,6 @@ MIT License - see LICENSE file for details
 ### 0.1.0
 
 - Class-based API with `Document` class
-- Better error handling with detailed exceptions and context
-- Support for common ADF node types (doc, paragraph, text, headings, lists, tables, etc.)
+- Support for common ADF node types
 - Type-safe architecture with comprehensive type hints (Python 3.11+)
-- Registry pattern for extensibility
 - Flexible input handling (JSON strings, dictionaries, individual nodes)
-- Debug mode for troubleshooting

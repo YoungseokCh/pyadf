@@ -1,8 +1,8 @@
 # pyadf
 
-![](https://img.shields.io/badge/Python-3776AB?style=flat&logo=python&logoColor=white) ![](https://img.shields.io/badge/Rust-000000?style=flat&logo=rust&logoColor=white) ![](https://img.shields.io/pypi/v/pyadf)
+![](https://img.shields.io/badge/Python-3776AB?style=flat&logo=python&logoColor=white) ![](https://img.shields.io/pypi/v/pyadf)
 
-A high-performance Python library for converting [Atlassian Document Format (ADF)](https://developer.atlassian.com/cloud/jira/platform/apis/document/structure/) to Markdown, powered by a Rust core.
+A high-performance Python library for converting [Atlassian Document Format (ADF)](https://developer.atlassian.com/cloud/jira/platform/apis/document/structure/) to Markdown.
 
 ## Features
 

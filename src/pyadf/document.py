@@ -1,53 +1,45 @@
-"""Document class for ADF to Markdown conversion."""
+"""Document class for Atlassian document format conversion."""
 
 from . import _core
 from .exceptions import InvalidInputError
 from .markdown import MarkdownConfig
 
+_FORMAT_PARSERS = {
+    "jira": "_core.parse_jira_str",
+    "markdown": "_core.parse_markdown_str",
+    "html": "_core.parse_html_str",
+}
+
 
 class Document:
-    """
-    Document class for handling Atlassian Document Format (ADF).
+    """Universal document class for Atlassian content formats.
 
-    This class provides a clean interface for converting ADF to Markdown.
-    ADF input is parsed and validated eagerly at construction time (input
-    errors surface here). Rendering from the cached tree in to_markdown()
-    cannot fail due to bad input.
+    Accepts multiple input formats (ADF, Jira markup, Markdown, HTML) and
+    normalizes to an ADF tree internally. All input is parsed eagerly at
+    construction time; rendering via to_markdown() cannot fail due to bad input.
 
     Example:
         >>> doc = Document('{"type": "doc", "content": [...]}')
-        >>> markdown_text = doc.to_markdown()
-
         >>> doc = Document({"type": "doc", "content": [...]})
-        >>> markdown_text = doc.to_markdown()
-
         >>> doc = Document("h1. Hello", format="jira")
-        >>> markdown_text = doc.to_markdown()  # Returns "# Hello"
-
-        >>> doc = Document()  # Empty document
-        >>> markdown_text = doc.to_markdown()  # Returns ""
+        >>> doc = Document("# Hello", format="markdown")
+        >>> doc = Document("<h1>Hello</h1>", format="html")
+        >>> doc.to_markdown()
     """
 
-    _VALID_FORMATS = ("adf", "jira")
+    _VALID_FORMATS = ("adf", "jira", "markdown", "html")
 
     def __init__(self, adf: str | dict | None = None, *, format: str = "adf") -> None:
-        """
-        Initialize a Document from ADF or Jira markup data.
-
-        Parses and validates the input eagerly. All input-related errors are
-        raised here so that to_markdown() only performs rendering.
+        """Initialize a Document from content in any supported format.
 
         Args:
-            adf: Input data as a JSON string, dict, Jira markup string, or None.
-            format: Input format -- "adf" (default) or "jira".
+            adf: Input data as a string, dict (ADF only), or None.
+            format: Input format -- "adf" (default), "jira", "markdown", or "html".
 
         Raises:
-            ValueError: If format is invalid or dict is used with format="jira"
-            InvalidJSONError: If adf is a string in ADF mode but not valid JSON
-            InvalidInputError: If adf has an unsupported type
-            UnsupportedNodeTypeError: If ADF contains unsupported node types
-            MissingFieldError: If required fields are missing
-            InvalidFieldError: If fields have invalid values
+            ValueError: If format is invalid or dict used with non-ADF format.
+            InvalidJSONError: If ADF string is not valid JSON.
+            InvalidInputError: If input type is unsupported.
         """
         if format not in self._VALID_FORMATS:
             raise ValueError(
@@ -59,15 +51,16 @@ class Document:
         if adf is None:
             return
 
-        if format == "jira":
+        if format != "adf":
             if isinstance(adf, dict):
-                raise ValueError("format='jira' requires a string, not dict")
+                raise ValueError(f"format={format!r} requires a string, not dict")
             if not isinstance(adf, str):
                 raise InvalidInputError(
                     expected_type="str or None",
                     actual_type=type(adf).__name__,
                 )
-            self._parsed = _core.parse_jira_str(adf)
+            parser = getattr(_core, f"parse_{format}_str")
+            self._parsed = parser(adf)
             return
 
         # format == "adf"
@@ -82,17 +75,13 @@ class Document:
             )
 
     def to_markdown(self, config: MarkdownConfig | None = None) -> str:
-        """
-        Convert the ADF document to Markdown.
-
-        Renders from the pre-parsed tree cached at construction time.
+        """Convert the document to Markdown.
 
         Args:
-            config: Optional markdown configuration options
+            config: Optional markdown configuration options.
 
         Returns:
-            Markdown representation of the ADF content. Returns empty string
-            if the document is empty or if the root node is None.
+            Markdown string. Empty string if the document is empty.
         """
         if self._parsed is None:
             return ""

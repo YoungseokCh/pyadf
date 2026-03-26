@@ -351,7 +351,7 @@ fn attr_u32(attrs: &serde_json::Map<String, Value>, key: &str, default: u32) -> 
     attrs
         .get(key)
         .and_then(|v| v.as_i64())
-        .map(|v| v.max(1) as u32)
+        .map(|v| v.clamp(1, 1000) as u32)
         .unwrap_or(default)
 }
 

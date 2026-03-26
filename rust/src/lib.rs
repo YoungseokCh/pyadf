@@ -4,7 +4,7 @@ use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList, PyNone, PyString};
 mod adf_node;
 mod config;
 mod errors;
-mod html_helpers;
+mod node_builders;
 mod html_to_adf;
 mod jira_markup;
 mod jira_patterns;

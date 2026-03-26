@@ -1,5 +1,3 @@
-use regex::Regex;
-
 use crate::jira_patterns::*;
 
 /// Convert Markdown to Jira wiki markup format.
@@ -79,11 +77,8 @@ pub fn markdown_to_jira(input: &str) -> String {
         .to_string();
 
     // HTML tags to Jira markup
-    for (tag, replacement) in HTML_TAG_MAP.iter() {
-        let re = Regex::new(&format!(r"<{tag}>(.*?)</{tag}>")).unwrap();
-        output = re
-            .replace_all(&output, format!("{replacement}$1{replacement}"))
-            .to_string();
+    for (re, replacement) in RE_M2J_HTML_TAGS.iter() {
+        output = re.replace_all(&output, replacement.as_str()).to_string();
     }
 
     // Colored text

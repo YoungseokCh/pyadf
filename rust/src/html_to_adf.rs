@@ -1,7 +1,7 @@
 use scraper::{Html, Node};
 
 use crate::adf_node::{AdfNode, Mark, NodeKind};
-use crate::html_helpers::{
+use crate::node_builders::{
     collapse_whitespace, doc_node, extract_color_from_style, extract_pre_content, mark, text_node,
     wrap_inline_in_paragraph,
 };
@@ -30,7 +30,7 @@ impl HtmlToAdfBuilder {
         node_id: ego_tree::NodeId,
         html: &Html,
     ) -> Vec<AdfNode> {
-        let node_ref = html.tree.get(node_id).unwrap();
+        let node_ref = html.tree.get(node_id).expect("BUG: NodeId must belong to this Html tree");
         let mut result = Vec::new();
         for child in node_ref.children() {
             result.extend(self.process_node(child.id(), html));
@@ -39,7 +39,7 @@ impl HtmlToAdfBuilder {
     }
 
     fn process_node(&mut self, node_id: ego_tree::NodeId, html: &Html) -> Vec<AdfNode> {
-        let node_ref = html.tree.get(node_id).unwrap();
+        let node_ref = html.tree.get(node_id).expect("BUG: NodeId must belong to this Html tree");
         match node_ref.value() {
             Node::Text(text) => self.process_text(text),
             Node::Element(elem) => self.process_element(node_id, elem, html),
@@ -131,7 +131,7 @@ impl HtmlToAdfBuilder {
     }
 
     fn process_pre(&mut self, node_id: ego_tree::NodeId, html: &Html) -> AdfNode {
-        let node_ref = html.tree.get(node_id).unwrap();
+        let node_ref = html.tree.get(node_id).expect("BUG: NodeId must belong to this Html tree");
         let (language, text) = extract_pre_content(&node_ref);
         AdfNode {
             kind: NodeKind::CodeBlock { language },

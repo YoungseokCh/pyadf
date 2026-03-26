@@ -22,7 +22,7 @@ pub static RE_M2J_BULLET_LIST: LazyLock<Regex> =
 pub static RE_M2J_NUM_LIST: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?m)^(\s+)1\. (.*)$").unwrap());
 pub static RE_M2J_COLOR: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r#"(?s)<span style="color:(#[^"]+)">([\s\S]*?)</span>"#).unwrap()
+    Regex::new(r#"(?s)<span style="color:([^"]+)">([\s\S]*?)</span>"#).unwrap()
 });
 pub static RE_M2J_STRIKE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"~~(.*?)~~").unwrap());
@@ -33,7 +33,7 @@ pub static RE_M2J_IMG_ALT: LazyLock<Regex> =
 pub static RE_M2J_LINK: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\[([^\]]+)\]\(([^)]+)\)").unwrap());
 pub static RE_M2J_LINK_BARE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"<([^>]+)>").unwrap());
+    LazyLock::new(|| Regex::new(r"<((?:https?|ftp|mailto):[^>]+)>").unwrap());
 pub static RE_M2J_TABLE_SEP: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^\|[-\s|]+\|$").unwrap());
 
@@ -44,3 +44,14 @@ pub const HTML_TAG_MAP: &[(&str, &str)] = &[
     ("sup", "^"),
     ("sub", "~"),
 ];
+
+/// Pre-compiled regexes for HTML tag -> Jira markup replacement.
+pub static RE_M2J_HTML_TAGS: LazyLock<Vec<(Regex, String)>> = LazyLock::new(|| {
+    HTML_TAG_MAP
+        .iter()
+        .map(|(tag, repl)| {
+            let re = Regex::new(&format!(r"<{tag}>(.*?)</{tag}>")).unwrap();
+            (re, format!("{repl}$1{repl}"))
+        })
+        .collect()
+});

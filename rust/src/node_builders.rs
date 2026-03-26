@@ -17,6 +17,22 @@ pub fn mark(mark_type: &str) -> Mark {
     Mark { mark_type: mark_type.to_string(), href: None, color: None }
 }
 
+pub fn link_mark(href: &str) -> Mark {
+    Mark { mark_type: "link".to_string(), href: Some(href.to_string()), color: None }
+}
+
+pub fn color_mark(color: &str) -> Mark {
+    Mark { mark_type: "textColor".to_string(), href: None, color: Some(color.to_string()) }
+}
+
+pub fn paragraph_node(children: Vec<AdfNode>) -> AdfNode {
+    AdfNode { kind: NodeKind::Paragraph, children }
+}
+
+pub fn list_item_node(children: Vec<AdfNode>) -> AdfNode {
+    AdfNode { kind: NodeKind::ListItem, children }
+}
+
 /// Collapse HTML whitespace: newlines/tabs become spaces, runs of spaces become one.
 pub fn collapse_whitespace(s: &str) -> String {
     let mut result = String::with_capacity(s.len());

@@ -2,6 +2,7 @@ use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, T
 
 use crate::adf_node::{AdfNode, Mark, NodeKind};
 use crate::md_inline;
+use crate::node_builders;
 
 /// Parse a Markdown string into an ADF `Doc` node tree.
 pub fn parse_markdown(input: &str) -> AdfNode {
@@ -21,7 +22,7 @@ pub fn parse_markdown(input: &str) -> AdfNode {
 /// Stack-based ADF tree builder driven by pulldown-cmark events.
 struct AdfBuilder {
     stack: Vec<BuilderFrame>,
-    /// Whether the current list item context is a task item.
+    /// Whether the current row is inside a table header.
     in_table_head: bool,
 }
 
@@ -91,9 +92,9 @@ impl AdfBuilder {
                     NodeKind::TableCell { colspan: 1 }
                 }
             }
-            Tag::Emphasis => return self.push_mark(mark("em")),
-            Tag::Strong => return self.push_mark(mark("strong")),
-            Tag::Strikethrough => return self.push_mark(mark("strike")),
+            Tag::Emphasis => return self.push_mark(node_builders::mark("em")),
+            Tag::Strong => return self.push_mark(node_builders::mark("strong")),
+            Tag::Strikethrough => return self.push_mark(node_builders::mark("strike")),
             Tag::Link { dest_url, .. } => {
                 return self.push_mark(Mark {
                     mark_type: "link".to_string(),
@@ -159,7 +160,7 @@ impl AdfBuilder {
 
     fn add_code_text(&mut self, text: &str) {
         let mut marks = self.current_marks();
-        marks.push(mark("code"));
+        marks.push(node_builders::mark("code"));
         let node = AdfNode {
             kind: NodeKind::Text {
                 text: text.to_string(),
@@ -270,13 +271,6 @@ fn extract_language(kind: &CodeBlockKind) -> Option<String> {
     }
 }
 
-fn mark(mark_type: &str) -> Mark {
-    Mark {
-        mark_type: mark_type.to_string(),
-        href: None,
-        color: None,
-    }
-}
 
 #[cfg(test)]
 mod tests {

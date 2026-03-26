@@ -2,19 +2,20 @@ use regex::Regex;
 use std::sync::LazyLock;
 
 use crate::adf_node::Mark;
+use crate::node_builders;
 
 /// Parse an inline HTML opening tag and return the corresponding ADF mark.
 /// Supports: <ins>, <sup>, <sub>, <span style="color:...">.
 pub fn parse_html_open_tag(html: &str) -> Option<Mark> {
     let trimmed = html.trim();
     if trimmed.eq_ignore_ascii_case("<ins>") {
-        return Some(mark("underline"));
+        return Some(node_builders::mark("underline"));
     }
     if trimmed.eq_ignore_ascii_case("<sup>") {
-        return Some(mark("superscript"));
+        return Some(node_builders::mark("superscript"));
     }
     if trimmed.eq_ignore_ascii_case("<sub>") {
-        return Some(mark("subsup"));
+        return Some(node_builders::mark("subsup"));
     }
     if let Some(caps) = RE_SPAN_COLOR.captures(trimmed) {
         let color = caps.get(1).map(|m| m.as_str().to_string());
@@ -40,13 +41,6 @@ static RE_SPAN_COLOR: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r#"(?i)<span\s+style\s*=\s*"color:\s*([^"]+)"\s*>"#).unwrap()
 });
 
-fn mark(mark_type: &str) -> Mark {
-    Mark {
-        mark_type: mark_type.to_string(),
-        href: None,
-        color: None,
-    }
-}
 
 #[cfg(test)]
 mod tests {

@@ -193,6 +193,10 @@ class TestMarkdownToJira:
         result = markdown_to_jira('<span style="color:#ff0000">red</span>')
         assert "{color:#ff0000}red{color}" in result
 
+    def test_named_css_color(self):
+        result = markdown_to_jira('<span style="color:red">warning</span>')
+        assert "{color:red}warning{color}" in result
+
     def test_bullet_list(self):
         result = markdown_to_jira("- item")
         assert "* item" in result

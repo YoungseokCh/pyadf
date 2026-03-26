@@ -2,17 +2,18 @@ use regex::Regex;
 use std::sync::LazyLock;
 
 use crate::adf_node::{AdfNode, Mark, NodeKind};
+use crate::node_builders;
 
 /// Parse Jira wiki markup into an ADF node tree.
 pub fn parse_jira(input: &str) -> AdfNode {
     if input.is_empty() {
-        return doc_node(vec![]);
+        return node_builders::doc_node(vec![]);
     }
 
     let (text, blocks) = extract_block_elements(input);
     let lines: Vec<&str> = text.lines().collect();
     let children = parse_lines(&lines, &blocks);
-    doc_node(children)
+    node_builders::doc_node(children)
 }
 
 // --- Block element extraction ---
@@ -128,13 +129,13 @@ fn classify_line<'a>(line: &'a str) -> LineKind<'a> {
         return LineKind::Blank;
     }
     if let Some(caps) = RE_CODE_PH.captures(trimmed) {
-        return LineKind::CodePlaceholder(caps[1].parse().unwrap());
+        return LineKind::CodePlaceholder(caps[1].parse().unwrap_or(0));
     }
     if let Some(caps) = RE_NOFORMAT_PH.captures(trimmed) {
-        return LineKind::NoformatPlaceholder(caps[1].parse().unwrap());
+        return LineKind::NoformatPlaceholder(caps[1].parse().unwrap_or(0));
     }
     if let Some(caps) = RE_QUOTE_PH.captures(trimmed) {
-        return LineKind::QuotePlaceholder(caps[1].parse().unwrap());
+        return LineKind::QuotePlaceholder(caps[1].parse().unwrap_or(0));
     }
     if let Some(caps) = RE_HEADER.captures(trimmed) {
         let level: u8 = caps[1].parse().unwrap_or(1);
@@ -211,7 +212,7 @@ fn parse_lines(lines: &[&str], blocks: &ExtractedBlocks) -> Vec<AdfNode> {
                 i += 1;
             }
             LineKind::Paragraph(text) => {
-                nodes.push(paragraph_node(text));
+                nodes.push(inline_paragraph_node(text));
                 i += 1;
             }
         }
@@ -231,11 +232,11 @@ fn collect_list_items(
         let kind = classify_line(lines[i]);
         match &kind {
             LineKind::BulletItem(_, text) if is_bullet => {
-                items.push(list_item_node(text));
+                items.push(inline_list_item_node(text));
                 i += 1;
             }
             LineKind::OrderedItem(_, text) if !is_bullet => {
-                items.push(list_item_node(text));
+                items.push(inline_list_item_node(text));
                 i += 1;
             }
             _ => break,
@@ -276,17 +277,13 @@ fn parse_table_row(line: &str) -> AdfNode {
         };
         AdfNode {
             kind,
-            children: vec![paragraph_node(cell_text)],
+            children: vec![inline_paragraph_node(cell_text)],
         }
     }).collect();
     AdfNode { kind: NodeKind::TableRow, children }
 }
 
 // --- Node constructors ---
-
-fn doc_node(children: Vec<AdfNode>) -> AdfNode {
-    AdfNode { kind: NodeKind::Doc, children }
-}
 
 fn heading_node(level: u8, text: &str) -> AdfNode {
     AdfNode {
@@ -295,17 +292,14 @@ fn heading_node(level: u8, text: &str) -> AdfNode {
     }
 }
 
-fn paragraph_node(text: &str) -> AdfNode {
-    AdfNode {
-        kind: NodeKind::Paragraph,
-        children: parse_inline(text),
-    }
+fn inline_paragraph_node(text: &str) -> AdfNode {
+    node_builders::paragraph_node(parse_inline(text))
 }
 
 fn blockquote_node(text: &str) -> AdfNode {
     AdfNode {
         kind: NodeKind::Blockquote,
-        children: vec![paragraph_node(text)],
+        children: vec![inline_paragraph_node(text)],
     }
 }
 
@@ -313,7 +307,7 @@ fn quote_block_node(body: &str) -> AdfNode {
     let paragraphs: Vec<AdfNode> = body
         .split('\n')
         .filter(|l| !l.trim().is_empty())
-        .map(|l| paragraph_node(l.trim()))
+        .map(|l| inline_paragraph_node(l.trim()))
         .collect();
     AdfNode { kind: NodeKind::Blockquote, children: paragraphs }
 }
@@ -322,34 +316,12 @@ fn code_block_node(language: Option<String>, body: &str) -> AdfNode {
     let trimmed = body.trim_matches('\n');
     AdfNode {
         kind: NodeKind::CodeBlock { language },
-        children: vec![text_node(trimmed, vec![])],
+        children: vec![node_builders::text_node(trimmed, vec![])],
     }
 }
 
-fn list_item_node(text: &str) -> AdfNode {
-    AdfNode {
-        kind: NodeKind::ListItem,
-        children: vec![paragraph_node(text)],
-    }
-}
-
-fn text_node(text: &str, marks: Vec<Mark>) -> AdfNode {
-    AdfNode {
-        kind: NodeKind::Text { text: text.to_string(), marks },
-        children: vec![],
-    }
-}
-
-fn mark(mark_type: &str) -> Mark {
-    Mark { mark_type: mark_type.to_string(), href: None, color: None }
-}
-
-fn link_mark(href: &str) -> Mark {
-    Mark { mark_type: "link".to_string(), href: Some(href.to_string()), color: None }
-}
-
-fn color_mark(color: &str) -> Mark {
-    Mark { mark_type: "textColor".to_string(), href: None, color: Some(color.to_string()) }
+fn inline_list_item_node(text: &str) -> AdfNode {
+    node_builders::list_item_node(vec![inline_paragraph_node(text)])
 }
 
 // --- Inline markup parsing ---
@@ -382,59 +354,59 @@ fn parse_inline(text: &str) -> Vec<AdfNode> {
     for caps in RE_INLINE.captures_iter(text) {
         let m = caps.get(0).unwrap();
         if m.start() > last_end {
-            nodes.push(text_node(&text[last_end..m.start()], vec![]));
+            nodes.push(node_builders::text_node(&text[last_end..m.start()], vec![]));
         }
         last_end = m.end();
 
         let segment = match_inline_capture(&caps);
-        nodes.push(text_node(&segment.text, segment.marks));
+        nodes.push(node_builders::text_node(&segment.text, segment.marks));
     }
 
     if last_end < text.len() {
-        nodes.push(text_node(&text[last_end..], vec![]));
+        nodes.push(node_builders::text_node(&text[last_end..], vec![]));
     }
     if nodes.is_empty() {
-        nodes.push(text_node(text, vec![]));
+        nodes.push(node_builders::text_node(text, vec![]));
     }
     nodes
 }
 
 fn match_inline_capture(caps: &regex::Captures) -> Segment {
     if let Some(m) = caps.get(1) {
-        return Segment { text: m.as_str().to_string(), marks: vec![mark("code")] };
+        return Segment { text: m.as_str().to_string(), marks: vec![node_builders::mark("code")] };
     }
     if let (Some(color_val), Some(body)) = (caps.get(2), caps.get(3)) {
         return Segment {
             text: body.as_str().to_string(),
-            marks: vec![color_mark(color_val.as_str())],
+            marks: vec![node_builders::color_mark(color_val.as_str())],
         };
     }
     if let (Some(link_text), Some(url)) = (caps.get(4), caps.get(5)) {
         return Segment {
             text: link_text.as_str().to_string(),
-            marks: vec![link_mark(url.as_str())],
+            marks: vec![node_builders::link_mark(url.as_str())],
         };
     }
     if let Some(m) = caps.get(6) {
-        return Segment { text: m.as_str().to_string(), marks: vec![mark("strong")] };
+        return Segment { text: m.as_str().to_string(), marks: vec![node_builders::mark("strong")] };
     }
     if let Some(m) = caps.get(7) {
-        return Segment { text: m.as_str().to_string(), marks: vec![mark("em")] };
+        return Segment { text: m.as_str().to_string(), marks: vec![node_builders::mark("em")] };
     }
     if let Some(m) = caps.get(8) {
-        return Segment { text: m.as_str().to_string(), marks: vec![mark("strike")] };
+        return Segment { text: m.as_str().to_string(), marks: vec![node_builders::mark("strike")] };
     }
     if let Some(m) = caps.get(9) {
-        return Segment { text: m.as_str().to_string(), marks: vec![mark("underline")] };
+        return Segment { text: m.as_str().to_string(), marks: vec![node_builders::mark("underline")] };
     }
     if let Some(m) = caps.get(10) {
-        return Segment { text: m.as_str().to_string(), marks: vec![mark("superscript")] };
+        return Segment { text: m.as_str().to_string(), marks: vec![node_builders::mark("superscript")] };
     }
     if let Some(m) = caps.get(11) {
-        return Segment { text: m.as_str().to_string(), marks: vec![mark("subsup")] };
+        return Segment { text: m.as_str().to_string(), marks: vec![node_builders::mark("subsup")] };
     }
     if let Some(m) = caps.get(12) {
-        return Segment { text: m.as_str().to_string(), marks: vec![mark("em")] };
+        return Segment { text: m.as_str().to_string(), marks: vec![node_builders::mark("em")] };
     }
     Segment { text: String::new(), marks: vec![] }
 }

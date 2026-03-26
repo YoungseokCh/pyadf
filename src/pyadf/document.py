@@ -4,13 +4,6 @@ from . import _core
 from .exceptions import InvalidInputError
 from .markdown import MarkdownConfig
 
-_FORMAT_PARSERS = {
-    "jira": "_core.parse_jira_str",
-    "markdown": "_core.parse_markdown_str",
-    "html": "_core.parse_html_str",
-}
-
-
 class Document:
     """Universal document class for Atlassian content formats.
 
@@ -59,8 +52,12 @@ class Document:
                     expected_type="str or None",
                     actual_type=type(adf).__name__,
                 )
-            parser = getattr(_core, f"parse_{format}_str")
-            self._parsed = parser(adf)
+            if format == "jira":
+                self._parsed = _core.parse_jira_str(adf)
+            elif format == "markdown":
+                self._parsed = _core.parse_markdown_str(adf)
+            elif format == "html":
+                self._parsed = _core.parse_html_str(adf)
             return
 
         # format == "adf"

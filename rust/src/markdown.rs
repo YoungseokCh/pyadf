@@ -7,6 +7,7 @@ struct RenderContext<'a> {
     is_first: bool,
     is_prev_hard_break: bool,
     parent_kind: Option<ParentKind>,
+    list_indent: usize,
 }
 
 /// Lightweight tag for parent context (avoids cloning NodeKind).
@@ -32,6 +33,7 @@ pub fn render(node: &AdfNode, config: &MarkdownConfig) -> String {
         is_first: true,
         is_prev_hard_break: false,
         parent_kind: None,
+        list_indent: 0,
     };
     render_node(node, &ctx, &mut out);
     out
@@ -75,6 +77,7 @@ fn render_doc(node: &AdfNode, ctx: &RenderContext, out: &mut String) {
             is_first: true,
             is_prev_hard_break: false,
             parent_kind: Some(ParentKind::Doc),
+            list_indent: 0,
         };
         render_node(child, &child_ctx, &mut child_out);
         if !child_out.is_empty() {
@@ -139,9 +142,10 @@ fn render_text(text: &str, marks: &[crate::adf_node::Mark], ctx: &RenderContext,
         }
     }
     if let Some(mark) = marks.iter().find(|m| m.mark_type == "link") {
+        let safe_href = mark.href.as_deref().filter(|h| is_safe_url(h));
         formatted = format!("[{formatted}]");
         if ctx.config.show_links {
-            if let Some(href) = &mark.href {
+            if let Some(href) = safe_href {
                 if !href.is_empty() {
                     formatted = format!("{formatted}({href})");
                 }
@@ -157,24 +161,34 @@ fn render_hard_break(out: &mut String) {
 }
 
 fn render_bullet_list(node: &AdfNode, ctx: &RenderContext, out: &mut String) {
+    let is_nested = ctx.parent_kind == Some(ParentKind::ListItem);
+    if is_nested {
+        out.push('\n');
+    }
+    let indent = " ".repeat(ctx.list_indent);
     let marker = &ctx.config.bullet_marker;
     let mut items: Vec<String> = Vec::new();
     for child in &node.children {
         let mut item_out = String::new();
-        let child_ctx = child_context(ctx, ParentKind::BulletList, false, false);
+        let child_ctx = list_child_context(ctx, ParentKind::BulletList);
         render_node(child, &child_ctx, &mut item_out);
-        items.push(format!("{marker} {item_out}"));
+        items.push(format!("{indent}{marker} {item_out}"));
     }
     out.push_str(&items.join("\n"));
 }
 
 fn render_ordered_list(node: &AdfNode, ctx: &RenderContext, out: &mut String) {
+    let is_nested = ctx.parent_kind == Some(ParentKind::ListItem);
+    if is_nested {
+        out.push('\n');
+    }
+    let indent = " ".repeat(ctx.list_indent);
     let mut items: Vec<String> = Vec::new();
     for (idx, child) in node.children.iter().enumerate() {
         let mut item_out = String::new();
-        let child_ctx = child_context(ctx, ParentKind::OrderedList, false, false);
+        let child_ctx = list_child_context(ctx, ParentKind::OrderedList);
         render_node(child, &child_ctx, &mut item_out);
-        items.push(format!("{}. {item_out}", idx + 1));
+        items.push(format!("{indent}{}. {item_out}", idx + 1));
     }
     out.push_str(&items.join("\n"));
 }
@@ -216,6 +230,7 @@ fn render_children_as_blocks(node: &AdfNode, ctx: &RenderContext) -> String {
             is_first: true,
             is_prev_hard_break: false,
             parent_kind: parent_kind_of(&node.kind),
+            list_indent: ctx.list_indent,
         };
         render_node(child, &child_ctx, &mut child_out);
         if !child_out.is_empty() {
@@ -310,8 +325,14 @@ fn render_code_block(
 
 fn render_inline_card(url: Option<&str>, data: Option<&str>, out: &mut String) {
     if let Some(url) = url {
-        out.push_str(&format!("[{url}]"));
-    } else if let Some(data) = data {
+        if is_safe_url(url) {
+            out.push_str(&format!("[{url}]"));
+        } else {
+            out.push_str("<broken_inlinecard>");
+        }
+        return;
+    }
+    if let Some(data) = data {
         out.push_str(&format!("```\n{data}\n```"));
     } else {
         out.push_str("<broken_inlinecard>");
@@ -343,6 +364,22 @@ fn render_mention(text: Option<&str>, out: &mut String) {
     out.push_str(text.unwrap_or(""));
 }
 
+// --- URL safety ---
+
+/// Check whether a URL uses a safe scheme suitable for markdown output.
+/// Blocks javascript:, data:, vbscript: and other dangerous URI schemes.
+fn is_safe_url(url: &str) -> bool {
+    let trimmed = url.trim();
+    trimmed.starts_with("http://")
+        || trimmed.starts_with("https://")
+        || trimmed.starts_with("mailto:")
+        || trimmed.starts_with("ftp://")
+        || trimmed.starts_with("/")
+        || trimmed.starts_with("#")
+        || trimmed.starts_with("./")
+        || trimmed.starts_with("../")
+}
+
 // --- Helpers ---
 
 fn is_hard_break(node: &AdfNode) -> bool {
@@ -361,6 +398,7 @@ fn render_children(node: &AdfNode, ctx: &RenderContext, out: &mut String) {
             is_first: idx == 0,
             is_prev_hard_break: prev_hard_break,
             parent_kind: parent_kind_of(&node.kind),
+            list_indent: ctx.list_indent,
         };
         render_node(child, &child_ctx, out);
     }
@@ -383,6 +421,7 @@ fn render_children_with_parent(
             is_first: idx == 0,
             is_prev_hard_break: prev_hard_break,
             parent_kind: Some(parent),
+            list_indent: ctx.list_indent,
         };
         render_node(child, &child_ctx, out);
     }
@@ -399,6 +438,21 @@ fn child_context<'a>(
         is_first,
         is_prev_hard_break,
         parent_kind: Some(parent),
+        list_indent: ctx.list_indent,
+    }
+}
+
+/// Create a context for children of a list node, increasing indentation.
+fn list_child_context<'a>(
+    ctx: &RenderContext<'a>,
+    parent: ParentKind,
+) -> RenderContext<'a> {
+    RenderContext {
+        config: ctx.config,
+        is_first: false,
+        is_prev_hard_break: false,
+        parent_kind: Some(parent),
+        list_indent: ctx.list_indent + 2,
     }
 }
 
@@ -599,5 +653,44 @@ mod tests {
     fn trailing_space_formatting() {
         let result = apply_formatting("bold ", "**");
         assert_eq!(result, "**bold** ");
+    }
+
+    #[test]
+    fn javascript_url_stripped_in_link() {
+        let json = r#"{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"click","marks":[{"type":"link","attrs":{"href":"javascript:alert(1)"}}]}]}]}"#;
+        let config = MarkdownConfig::new("+", true).unwrap();
+        // Unsafe URL should not appear in output
+        assert_eq!(convert_with(json, &config), "[click]");
+    }
+
+    #[test]
+    fn data_url_stripped_in_link() {
+        let json = r#"{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"click","marks":[{"type":"link","attrs":{"href":"data:text/html,<script>alert(1)</script>"}}]}]}]}"#;
+        let config = MarkdownConfig::new("+", true).unwrap();
+        assert_eq!(convert_with(json, &config), "[click]");
+    }
+
+    #[test]
+    fn safe_urls_preserved() {
+        for url in &["http://example.com", "https://example.com", "mailto:a@b.com", "/path", "#anchor", "./rel", "../up"] {
+            let json = format!(
+                r#"{{"type":"doc","content":[{{"type":"paragraph","content":[{{"type":"text","text":"link","marks":[{{"type":"link","attrs":{{"href":"{url}"}}}}]}}]}}]}}"#
+            );
+            let config = MarkdownConfig::new("+", true).unwrap();
+            let result = convert_with(&json, &config);
+            assert!(result.contains(url), "URL {url} should be preserved in: {result}");
+        }
+    }
+
+    #[test]
+    fn javascript_url_stripped_in_inline_card() {
+        let json = r#"{"type":"inlineCard","attrs":{"url":"javascript:alert(1)"}}"#;
+        assert_eq!(convert(json), "<broken_inlinecard>");
+    }
+
+    #[test]
+    fn safe_url_in_inline_card() {
+        let json = r#"{"type":"inlineCard","attrs":{"url":"https://example.com"}}"#;
+        assert_eq!(convert(json), "[https://example.com]");
     }
 }

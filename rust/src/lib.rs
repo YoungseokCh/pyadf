@@ -2,16 +2,19 @@ use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList, PyNone, PyString};
 
 mod adf_node;
+mod adf_serialize;
 mod config;
 mod errors;
-mod node_builders;
+mod html_render;
 mod html_to_adf;
 mod jira_markup;
 mod jira_patterns;
+mod jira_render;
 mod jira_to_adf;
 mod markdown;
 mod md_inline;
 mod md_to_adf;
+mod node_builders;
 
 /// Convert a Python dict/list/scalar to serde_json::Value without going through JSON text.
 fn py_to_json_value(obj: &Bound<'_, PyAny>) -> PyResult<serde_json::Value> {
@@ -162,8 +165,59 @@ fn convert_jsonl_batch(
 }
 
 // ---------------------------------------------------------------------------
-// Jira markup <-> Markdown conversion
+// Output renderers: ADF JSON, HTML, Jira
 // ---------------------------------------------------------------------------
+
+/// Convert serde_json::Value to a Python object.
+fn json_value_to_py(py: Python<'_>, value: &serde_json::Value) -> PyResult<PyObject> {
+    match value {
+        serde_json::Value::Null => Ok(py.None()),
+        serde_json::Value::Bool(b) => Ok(PyBool::new(py, *b).to_owned().into_any().unbind()),
+        serde_json::Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                Ok(i.into_pyobject(py)?.into_any().unbind())
+            } else if let Some(f) = n.as_f64() {
+                Ok(f.into_pyobject(py)?.into_any().unbind())
+            } else {
+                Ok(py.None())
+            }
+        }
+        serde_json::Value::String(s) => Ok(s.into_pyobject(py)?.into_any().unbind()),
+        serde_json::Value::Array(arr) => {
+            let list = pyo3::types::PyList::empty(py);
+            for item in arr {
+                list.append(json_value_to_py(py, item)?)?;
+            }
+            Ok(list.into_any().unbind())
+        }
+        serde_json::Value::Object(map) => {
+            let dict = pyo3::types::PyDict::new(py);
+            for (k, v) in map {
+                dict.set_item(k, json_value_to_py(py, v)?)?;
+            }
+            Ok(dict.into_any().unbind())
+        }
+    }
+}
+
+/// Serialize a parsed ADF tree to a Python dict (ADF JSON).
+#[pyfunction]
+fn render_adf_json(py: Python<'_>, parsed: &ParsedAdf) -> PyResult<PyObject> {
+    let value = adf_serialize::serialize_to_value(&parsed.node);
+    json_value_to_py(py, &value)
+}
+
+/// Render a parsed ADF tree to HTML.
+#[pyfunction]
+fn render_html(parsed: &ParsedAdf) -> String {
+    html_render::render_html(&parsed.node)
+}
+
+/// Render a parsed ADF tree to Jira wiki markup.
+#[pyfunction]
+fn render_jira(parsed: &ParsedAdf) -> String {
+    jira_render::render_jira(&parsed.node)
+}
 
 // ---------------------------------------------------------------------------
 // Format-specific parsers
@@ -205,5 +259,8 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(parse_markdown_str, m)?)?;
     m.add_function(wrap_pyfunction!(parse_html_str, m)?)?;
     m.add_function(wrap_pyfunction!(markdown_to_jira, m)?)?;
+    m.add_function(wrap_pyfunction!(render_adf_json, m)?)?;
+    m.add_function(wrap_pyfunction!(render_html, m)?)?;
+    m.add_function(wrap_pyfunction!(render_jira, m)?)?;
     Ok(())
 }

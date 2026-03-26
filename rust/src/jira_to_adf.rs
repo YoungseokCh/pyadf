@@ -95,8 +95,8 @@ fn extract_quote(store: &mut Vec<String>, text: &str) -> String {
 #[derive(Debug)]
 enum LineKind<'a> {
     Header(u8, &'a str),
-    BulletItem(#[allow(dead_code)] usize, &'a str),
-    OrderedItem(#[allow(dead_code)] usize, &'a str),
+    BulletItem(usize, &'a str),
+    OrderedItem(usize, &'a str),
     TableRow(&'a str),
     Blockquote(&'a str),
     CodePlaceholder(usize),
@@ -226,24 +226,56 @@ fn collect_list_items(
     _blocks: &ExtractedBlocks,
     is_bullet: bool,
 ) -> (AdfNode, usize) {
+    let (items, consumed) = collect_items_at_depth(lines, start, is_bullet);
+    let list_kind = if is_bullet { NodeKind::BulletList } else { NodeKind::OrderedList };
+    (AdfNode { kind: list_kind, children: items }, consumed)
+}
+
+/// Collect list items, grouping deeper items as nested sub-lists.
+/// Returns (list_item_nodes, lines_consumed).
+fn collect_items_at_depth(
+    lines: &[&str],
+    start: usize,
+    is_bullet: bool,
+) -> (Vec<AdfNode>, usize) {
+    let base_depth = match classify_line(lines[start]) {
+        LineKind::BulletItem(d, _) if is_bullet => d,
+        LineKind::OrderedItem(d, _) if !is_bullet => d,
+        _ => return (vec![], 0),
+    };
+
     let mut items: Vec<AdfNode> = Vec::new();
     let mut i = start;
     while i < lines.len() {
-        let kind = classify_line(lines[i]);
-        match &kind {
-            LineKind::BulletItem(_, text) if is_bullet => {
-                items.push(inline_list_item_node(text));
-                i += 1;
-            }
-            LineKind::OrderedItem(_, text) if !is_bullet => {
-                items.push(inline_list_item_node(text));
-                i += 1;
-            }
+        let (depth, text, matches) = match classify_line(lines[i]) {
+            LineKind::BulletItem(d, t) if is_bullet => (d, t, true),
+            LineKind::OrderedItem(d, t) if !is_bullet => (d, t, true),
             _ => break,
+        };
+        if !matches {
+            break;
+        }
+        if depth < base_depth {
+            break;
+        }
+        if depth == base_depth {
+            items.push(inline_list_item_node(text));
+            i += 1;
+        } else {
+            // Deeper items: build a nested sub-list and attach to previous item
+            let (sub_items, sub_consumed) = collect_items_at_depth(lines, i, is_bullet);
+            let sub_kind = if is_bullet { NodeKind::BulletList } else { NodeKind::OrderedList };
+            let sub_list = AdfNode { kind: sub_kind, children: sub_items };
+            if let Some(last_item) = items.last_mut() {
+                last_item.children.push(sub_list);
+            } else {
+                // No preceding item at base depth -- wrap in a bare ListItem
+                items.push(node_builders::list_item_node(vec![sub_list]));
+            }
+            i += sub_consumed;
         }
     }
-    let list_kind = if is_bullet { NodeKind::BulletList } else { NodeKind::OrderedList };
-    (AdfNode { kind: list_kind, children: items }, i - start)
+    (items, i - start)
 }
 
 fn collect_table_rows(lines: &[&str], start: usize) -> (AdfNode, usize) {
@@ -507,5 +539,34 @@ mod tests {
         let result = jira_to_md(input);
         assert!(result.contains("> hello"));
         assert!(result.contains("> world"));
+    }
+
+    #[test]
+    fn nested_bullet_list() {
+        let input = "* a\n** b\n* c";
+        let result = jira_to_md(input);
+        assert!(result.contains("+ a"), "Expected '+ a' in: {result}");
+        assert!(result.contains("+ b"), "Expected nested '+ b' in: {result}");
+        assert!(result.contains("+ c"), "Expected '+ c' in: {result}");
+        // Nested item should be indented
+        assert!(result.contains("  + b"), "Expected '  + b' in: {result}");
+    }
+
+    #[test]
+    fn nested_ordered_list() {
+        let input = "# a\n## b\n# c";
+        let result = jira_to_md(input);
+        assert!(result.contains("1. a"), "Expected '1. a' in: {result}");
+        assert!(result.contains("1. b"), "Expected nested '1. b' in: {result}");
+        assert!(result.contains("2. c"), "Expected '2. c' in: {result}");
+    }
+
+    #[test]
+    fn deeply_nested_list() {
+        let input = "* a\n** b\n*** c";
+        let result = jira_to_md(input);
+        assert!(result.contains("+ a"), "Expected '+ a' in: {result}");
+        assert!(result.contains("  + b"), "Expected '  + b' in: {result}");
+        assert!(result.contains("    + c"), "Expected '    + c' in: {result}");
     }
 }

@@ -88,3 +88,33 @@ class Document:
             rust_config = _core.MarkdownConfig(config.bullet_marker, config.show_links)
 
         return _core.render_markdown(self._parsed, rust_config)
+
+    def to_adf(self) -> dict | None:
+        """Serialize the document to an ADF JSON dict.
+
+        Returns:
+            ADF dict, or None if the document is empty.
+        """
+        if self._parsed is None:
+            return None
+        return _core.render_adf_json(self._parsed)
+
+    def to_html(self) -> str:
+        """Render the document to HTML.
+
+        Returns:
+            HTML string. Empty string if the document is empty.
+        """
+        if self._parsed is None:
+            return ""
+        return _core.render_html(self._parsed)
+
+    def to_jira(self) -> str:
+        """Render the document to Jira wiki markup.
+
+        Returns:
+            Jira markup string. Empty string if the document is empty.
+        """
+        if self._parsed is None:
+            return ""
+        return _core.render_jira(self._parsed)

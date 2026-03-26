@@ -91,6 +91,27 @@ class TestLists:
         jira = "# first\n# second"
         assert Document(jira, format="jira").to_markdown() == "1. first\n2. second"
 
+    def test_nested_bullet_list(self):
+        jira = "* a\n** b\n* c"
+        result = Document(jira, format="jira").to_markdown()
+        assert "+ a" in result
+        assert "  + b" in result
+        assert "+ c" in result
+
+    def test_nested_ordered_list(self):
+        jira = "# a\n## b\n# c"
+        result = Document(jira, format="jira").to_markdown()
+        assert "1. a" in result
+        assert "  1. b" in result
+        assert "2. c" in result
+
+    def test_deeply_nested_list(self):
+        jira = "* a\n** b\n*** c"
+        result = Document(jira, format="jira").to_markdown()
+        assert "+ a" in result
+        assert "  + b" in result
+        assert "    + c" in result
+
 
 class TestTables:
     def test_header_and_data_rows(self):

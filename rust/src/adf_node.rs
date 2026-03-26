@@ -120,10 +120,13 @@ pub fn parse_adf(json: &str) -> Result<AdfNode, AdfError> {
     parse_adf_value(&value, "")
 }
 
+/// Maximum allowed nesting depth for ADF nodes.
+const MAX_DEPTH: usize = 200;
+
 /// Parse a pre-built serde_json::Value into an ADF node tree.
 pub fn parse_adf_value(value: &Value, node_path: &str) -> Result<AdfNode, AdfError> {
     match value {
-        Value::Object(_) => parse_node(value, node_path),
+        Value::Object(_) => parse_node(value, node_path, 0),
         _ => Err(AdfError::InvalidInput {
             expected_type: "JSON object, dict, or None".to_string(),
             actual_type: json_type_name(value).to_string(),
@@ -156,7 +159,14 @@ fn json_type_name(v: &Value) -> &'static str {
     }
 }
 
-fn parse_node(value: &Value, node_path: &str) -> Result<AdfNode, AdfError> {
+fn parse_node(value: &Value, node_path: &str, depth: usize) -> Result<AdfNode, AdfError> {
+    if depth > MAX_DEPTH {
+        return Err(AdfError::InvalidInput {
+            expected_type: format!("nesting depth <= {MAX_DEPTH}"),
+            actual_type: format!("depth {depth}"),
+        });
+    }
+
     let obj = value.as_object().ok_or_else(|| AdfError::InvalidField {
         field_name: "node".to_string(),
         invalid_value: json_type_name(value).to_string(),
@@ -190,7 +200,7 @@ fn parse_node(value: &Value, node_path: &str) -> Result<AdfNode, AdfError> {
     validate_attrs(obj, &current_path)?;
 
     // Parse children
-    let children = parse_children(obj, type_str, &current_path)?;
+    let children = parse_children(obj, type_str, &current_path, depth)?;
 
     // Build NodeKind from type string + obj fields (reads attrs by reference, no clone)
     let attrs = obj
@@ -223,6 +233,7 @@ fn parse_children(
     obj: &serde_json::Map<String, Value>,
     type_str: &str,
     node_path: &str,
+    depth: usize,
 ) -> Result<Vec<AdfNode>, AdfError> {
     match obj.get("content") {
         Some(Value::Array(arr)) => {
@@ -242,7 +253,7 @@ fn parse_children(
                 } else {
                     format!("{node_path} > {type_str}[{idx}]")
                 };
-                kids.push(parse_node(child_val, &child_path)?);
+                kids.push(parse_node(child_val, &child_path, depth + 1)?);
             }
             Ok(kids)
         }
@@ -536,5 +547,19 @@ mod tests {
             AdfError::InvalidField { field_name, .. } => assert_eq!(field_name, "marks"),
             other => panic!("Expected InvalidField, got: {other:?}"),
         }
+    }
+
+    #[test]
+    fn parse_deeply_nested_exceeds_depth_limit() {
+        // Build a 250-level nested structure via serde_json::Value
+        // to bypass serde's JSON recursion limit.
+        let mut value = serde_json::json!({"type": "text", "text": "deep"});
+        for _ in 0..250 {
+            value = serde_json::json!({"type": "doc", "content": [value]});
+        }
+        let result = parse_adf_value(&value, "");
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("depth"), "Error should mention depth: {err_msg}");
     }
 }

@@ -157,6 +157,17 @@ class TestErrorMessageQuality:
         assert '"doc"' in error_str or '"paragraph"' in error_str
 
 
+class TestRecursionDepth:
+    def test_deeply_nested_adf_raises(self):
+        """ADF nesting beyond 200 levels should raise an error, not stack overflow."""
+        node = {"type": "text", "text": "deep"}
+        for _ in range(300):
+            node = {"type": "doc", "content": [node]}
+        with pytest.raises(InvalidInputError) as exc_info:
+            Document(node)
+        assert "depth" in str(exc_info.value)
+
+
 class TestValidData:
     def test_valid_document(self):
         doc = Document(

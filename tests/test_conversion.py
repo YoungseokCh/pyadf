@@ -285,6 +285,95 @@ class TestEmoji:
         assert Document(adf).to_markdown() == ":awthanks:"
 
 
+class TestURLSafety:
+    def test_javascript_url_stripped(self):
+        """Link with javascript: URL should not include the href."""
+        adf = {
+            "type": "paragraph",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "click me",
+                    "marks": [{"type": "link", "attrs": {"href": "javascript:alert(1)"}}],
+                },
+            ],
+        }
+        config = MarkdownConfig(show_links=True)
+        result = Document(adf).to_markdown(config)
+        assert result == "[click me]"
+        assert "javascript:" not in result
+
+    def test_safe_urls_preserved(self):
+        """http, https, mailto, relative paths should all work."""
+        safe_urls = [
+            "http://example.com",
+            "https://example.com",
+            "mailto:a@b.com",
+            "ftp://files.example.com",
+            "/relative/path",
+            "#anchor",
+            "./local",
+            "../parent",
+        ]
+        config = MarkdownConfig(show_links=True)
+        for url in safe_urls:
+            adf = {
+                "type": "paragraph",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "link",
+                        "marks": [{"type": "link", "attrs": {"href": url}}],
+                    },
+                ],
+            }
+            result = Document(adf).to_markdown(config)
+            assert url in result, f"URL {url!r} should be preserved in: {result!r}"
+
+    def test_data_url_stripped(self):
+        """data: URLs should be blocked."""
+        adf = {
+            "type": "paragraph",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "click",
+                    "marks": [
+                        {"type": "link", "attrs": {"href": "data:text/html,<h1>xss</h1>"}},
+                    ],
+                },
+            ],
+        }
+        config = MarkdownConfig(show_links=True)
+        result = Document(adf).to_markdown(config)
+        assert "data:" not in result
+
+    def test_vbscript_url_stripped(self):
+        """vbscript: URLs should be blocked."""
+        adf = {
+            "type": "paragraph",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "click",
+                    "marks": [
+                        {"type": "link", "attrs": {"href": "vbscript:MsgBox"}},
+                    ],
+                },
+            ],
+        }
+        config = MarkdownConfig(show_links=True)
+        result = Document(adf).to_markdown(config)
+        assert "vbscript:" not in result
+
+    def test_javascript_url_in_inline_card(self):
+        """InlineCard with javascript: URL should show broken_inlinecard."""
+        adf = {"type": "inlineCard", "attrs": {"url": "javascript:alert(1)"}}
+        result = Document(adf).to_markdown()
+        assert result == "<broken_inlinecard>"
+        assert "javascript:" not in result
+
+
 class TestMention:
     def test_mention(self):
         adf = {

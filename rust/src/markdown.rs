@@ -104,19 +104,41 @@ fn render_text(text: &str, marks: &[crate::adf_node::Mark], ctx: &RenderContext,
         return;
     }
 
-    let is_bold = marks.iter().any(|m| m.mark_type == "strong");
-    let is_italic = marks.iter().any(|m| m.mark_type == "em");
-    let link_mark = marks.iter().find(|m| m.mark_type == "link");
+    // Code mark takes precedence: no bold/italic inside code
+    let is_code = marks.iter().any(|m| m.mark_type == "code");
+    if is_code {
+        out.push('`');
+        out.push_str(text);
+        out.push('`');
+        return;
+    }
 
     let mut formatted = text.to_string();
 
-    if is_bold {
+    if marks.iter().any(|m| m.mark_type == "strong") {
         formatted = apply_formatting(&formatted, "**");
     }
-    if is_italic {
+    if marks.iter().any(|m| m.mark_type == "em") {
         formatted = apply_formatting(&formatted, "*");
     }
-    if let Some(mark) = link_mark {
+    if marks.iter().any(|m| m.mark_type == "strike") {
+        formatted = apply_formatting(&formatted, "~~");
+    }
+    if marks.iter().any(|m| m.mark_type == "underline") {
+        formatted = format!("<ins>{formatted}</ins>");
+    }
+    if marks.iter().any(|m| m.mark_type == "superscript") {
+        formatted = format!("<sup>{formatted}</sup>");
+    }
+    if marks.iter().any(|m| m.mark_type == "subsup") {
+        formatted = format!("<sub>{formatted}</sub>");
+    }
+    if let Some(mark) = marks.iter().find(|m| m.mark_type == "textColor") {
+        if let Some(color) = &mark.color {
+            formatted = format!("<span style=\"color:{color}\">{formatted}</span>");
+        }
+    }
+    if let Some(mark) = marks.iter().find(|m| m.mark_type == "link") {
         formatted = format!("[{formatted}]");
         if ctx.config.show_links {
             if let Some(href) = &mark.href {

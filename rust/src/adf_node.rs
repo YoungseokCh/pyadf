@@ -6,6 +6,7 @@ use serde_json::Value;
 pub struct Mark {
     pub mark_type: String,
     pub href: Option<String>,
+    pub color: Option<String>,
 }
 
 /// Node-specific data for each ADF node type.
@@ -387,14 +388,19 @@ fn parse_marks(
             .unwrap_or("")
             .to_string();
 
-        let href = mark_obj
-            .get("attrs")
-            .and_then(|a| a.as_object())
+        let attrs = mark_obj.get("attrs").and_then(|a| a.as_object());
+
+        let href = attrs
             .and_then(|a| a.get("href"))
             .and_then(|v| v.as_str())
             .map(String::from);
 
-        marks.push(Mark { mark_type, href });
+        let color = attrs
+            .and_then(|a| a.get("color"))
+            .and_then(|v| v.as_str())
+            .map(String::from);
+
+        marks.push(Mark { mark_type, href, color });
     }
 
     Ok(marks)

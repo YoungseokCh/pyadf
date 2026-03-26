@@ -4,6 +4,9 @@ use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList, PyNone, PyString};
 mod adf_node;
 mod config;
 mod errors;
+mod jira_markup;
+mod jira_patterns;
+mod jira_to_adf;
 mod markdown;
 
 /// Convert a Python dict/list/scalar to serde_json::Value without going through JSON text.
@@ -154,6 +157,26 @@ fn convert_jsonl_batch(
     Ok(results)
 }
 
+// ---------------------------------------------------------------------------
+// Jira markup <-> Markdown conversion
+// ---------------------------------------------------------------------------
+
+/// Parse Jira wiki markup and return a cached ADF handle.
+#[pyfunction]
+fn parse_jira_str(input: &str) -> ParsedAdf {
+    ParsedAdf { node: jira_to_adf::parse_jira(input) }
+}
+
+#[pyfunction]
+fn jira_to_markdown(input: &str) -> String {
+    jira_markup::jira_to_markdown(input)
+}
+
+#[pyfunction]
+fn markdown_to_jira(input: &str) -> String {
+    jira_markup::markdown_to_jira(input)
+}
+
 #[pymodule]
 fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<ParsedAdf>()?;
@@ -163,5 +186,8 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(render_markdown, m)?)?;
     m.add_function(wrap_pyfunction!(document_to_markdown, m)?)?;
     m.add_function(wrap_pyfunction!(convert_jsonl_batch, m)?)?;
+    m.add_function(wrap_pyfunction!(parse_jira_str, m)?)?;
+    m.add_function(wrap_pyfunction!(jira_to_markdown, m)?)?;
+    m.add_function(wrap_pyfunction!(markdown_to_jira, m)?)?;
     Ok(())
 }

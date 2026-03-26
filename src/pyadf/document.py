@@ -21,35 +21,56 @@ class Document:
         >>> doc = Document({"type": "doc", "content": [...]})
         >>> markdown_text = doc.to_markdown()
 
+        >>> doc = Document("h1. Hello", format="jira")
+        >>> markdown_text = doc.to_markdown()  # Returns "# Hello"
+
         >>> doc = Document()  # Empty document
         >>> markdown_text = doc.to_markdown()  # Returns ""
     """
 
-    def __init__(self, adf: str | dict | None = None) -> None:
-        """
-        Initialize a Document from ADF data.
+    _VALID_FORMATS = ("adf", "jira")
 
-        Parses and validates the ADF structure eagerly. All input-related
-        errors (bad JSON, missing fields, unsupported node types) are raised
-        here so that to_markdown() only performs rendering.
+    def __init__(self, adf: str | dict | None = None, *, format: str = "adf") -> None:
+        """
+        Initialize a Document from ADF or Jira markup data.
+
+        Parses and validates the input eagerly. All input-related errors are
+        raised here so that to_markdown() only performs rendering.
 
         Args:
-            adf: ADF data as a JSON string, dict, or None for empty document.
-                 Can be any ADF node type including "doc".
+            adf: Input data as a JSON string, dict, Jira markup string, or None.
+            format: Input format -- "adf" (default) or "jira".
 
         Raises:
-            InvalidJSONError: If adf is a string but not valid JSON
-            InvalidInputError: If adf has invalid type
+            ValueError: If format is invalid or dict is used with format="jira"
+            InvalidJSONError: If adf is a string in ADF mode but not valid JSON
+            InvalidInputError: If adf has an unsupported type
             UnsupportedNodeTypeError: If ADF contains unsupported node types
             MissingFieldError: If required fields are missing
             InvalidFieldError: If fields have invalid values
-            NodeCreationError: If node creation fails
         """
+        if format not in self._VALID_FORMATS:
+            raise ValueError(
+                f"Invalid format: {format!r}. Must be one of {self._VALID_FORMATS}"
+            )
+
         self._parsed: _core.ParsedAdf | None = None
 
         if adf is None:
             return
 
+        if format == "jira":
+            if isinstance(adf, dict):
+                raise ValueError("format='jira' requires a string, not dict")
+            if not isinstance(adf, str):
+                raise InvalidInputError(
+                    expected_type="str or None",
+                    actual_type=type(adf).__name__,
+                )
+            self._parsed = _core.parse_jira_str(adf)
+            return
+
+        # format == "adf"
         if isinstance(adf, str):
             self._parsed = _core.parse_adf_str(adf)
         elif isinstance(adf, dict):

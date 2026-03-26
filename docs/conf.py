@@ -3,7 +3,7 @@
 project = "pyadf"
 copyright = "2024, Youngseok Choi"
 author = "Youngseok Choi"
-release = "0.4.1"
+release = "0.5.0"
 
 extensions = [
     "sphinx.ext.autodoc",

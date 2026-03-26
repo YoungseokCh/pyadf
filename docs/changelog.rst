@@ -1,13 +1,15 @@
 Changelog
 =========
 
-0.5.0 (Unreleased)
--------------------
+0.5.0
+-----
 
-- **Jira wiki markup support**: ``Document(text, format="jira")`` parses Jira markup into
-  ADF tree for rendering
+- **Multi-format Document**: ``Document(text, format=)`` now accepts ``"adf"``, ``"jira"``,
+  ``"markdown"``, and ``"html"``
+- **Jira wiki markup**: bidirectional conversion via ADF tree
+- **Markdown parser**: pulldown-cmark-based Markdown to ADF tree conversion
+- **HTML/XHTML parser**: html5ever-based HTML to ADF tree (Confluence storage format)
 - **Standalone Jira conversion**: ``markdown_to_jira()`` for Markdown to Jira markup
-  convenience functions
 - **New mark types**: ``code``, ``strike``, ``underline``, ``superscript``, ``subsup``,
   ``textColor`` marks now render to Markdown
 - **Read the Docs** documentation

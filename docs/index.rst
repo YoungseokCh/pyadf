@@ -14,13 +14,18 @@ powered by a Rust core via PyO3.
 
    # From Jira wiki markup
    doc = Document("h1. Hello *world*", format="jira")
-   print(doc.to_markdown())  # "# Hello **world**"
+
+   # From Markdown
+   doc = Document("# Hello **world**", format="markdown")
+
+   # From HTML/XHTML (Confluence storage format)
+   doc = Document("<h1>Hello <b>world</b></h1>", format="html")
 
 Features
 --------
 
 - **Rust-powered** parsing and rendering via PyO3 (5x faster single-doc, 24x faster batch)
-- **Multiple input formats** -- ADF JSON/dict and Jira wiki markup
+- **Multiple input formats** -- ADF, Jira wiki markup, Markdown, HTML/XHTML
 - **Streaming JSONL API** for ETL pipelines processing millions of documents
 - **Eager validation** -- structure errors surface at construction time
 - **21 ADF node types** with comprehensive formatting support

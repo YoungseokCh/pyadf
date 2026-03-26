@@ -55,6 +55,31 @@ Convert Jira Markup to Markdown
    print(doc.to_markdown())
    # Output: # Hello **world**
 
+Convert Markdown
+~~~~~~~~~~~~~~~~
+
+.. code-block:: python
+
+   from pyadf import Document
+
+   doc = Document("# Hello **world**", format="markdown")
+   print(doc.to_markdown())  # # Hello **world**
+
+Convert HTML/XHTML
+~~~~~~~~~~~~~~~~~~
+
+Works with Confluence storage format and standard HTML:
+
+.. code-block:: python
+
+   from pyadf import Document
+
+   doc = Document("<h1>Hello <b>world</b></h1>", format="html")
+   print(doc.to_markdown())  # # Hello **world**
+
+Convert Markdown to Jira Markup
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 To convert Markdown back to Jira markup:
 
 .. code-block:: python

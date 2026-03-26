@@ -27,9 +27,11 @@ keywords = ["adf", "markdown", "atlassian", "converter", "confluence", "jira"]
 
 [project.optional-dependencies]
 dev = ["pytest>=7.0", "mypy>=1.0", "pyright>=1.1"]
+docs = ["sphinx>=7.0", "furo>=2024.0", "sphinx-copybutton>=0.5", "myst-parser>=3.0"]
 
 [project.urls]
 Homepage = "https://github.com/YoungseokCh/pyadf"
+Documentation = "https://pyadf.readthedocs.io"
 Repository = "https://github.com/YoungseokCh/pyadf"
 Issues = "https://github.com/YoungseokCh/pyadf/issues"
 

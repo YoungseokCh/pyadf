@@ -6,7 +6,7 @@ Changelog
 
 - **Jira wiki markup support**: ``Document(text, format="jira")`` parses Jira markup into
   ADF tree for rendering
-- **Standalone Jira conversion**: ``jira_to_markdown()`` and ``markdown_to_jira()``
+- **Standalone Jira conversion**: ``markdown_to_jira()`` for Markdown to Jira markup
   convenience functions
 - **New mark types**: ``code``, ``strike``, ``underline``, ``superscript``, ``subsup``,
   ``textColor`` marks now render to Markdown

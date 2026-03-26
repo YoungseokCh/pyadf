@@ -18,8 +18,6 @@ Configuration
 Jira Conversion
 ---------------
 
-.. autofunction:: pyadf.jira_to_markdown
-
 .. autofunction:: pyadf.markdown_to_jira
 
 Batch Processing

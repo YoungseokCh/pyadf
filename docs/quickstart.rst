@@ -55,14 +55,11 @@ Convert Jira Markup to Markdown
    print(doc.to_markdown())
    # Output: # Hello **world**
 
-Or use the standalone convenience functions:
+To convert Markdown back to Jira markup:
 
 .. code-block:: python
 
-   from pyadf import jira_to_markdown, markdown_to_jira
-
-   md = jira_to_markdown("h2. Section\n*bold text*")
-   # "## Section\n**bold text**"
+   from pyadf import markdown_to_jira
 
    jira = markdown_to_jira("## Section\n**bold text**")
    # "h2. Section\n*bold text*"

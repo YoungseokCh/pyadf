@@ -155,17 +155,3 @@ The reverse conversion is available via :func:`pyadf.markdown_to_jira`:
 
    jira = markdown_to_jira("## Section\n**bold text**")
    # "h2. Section\n*bold text*"
-
-Two Conversion Paths
-~~~~~~~~~~~~~~~~~~~~
-
-There are two ways to convert Jira markup:
-
-1. **Via ADF tree** (``Document(text, format="jira")``): Parses Jira markup into an ADF
-   node tree, then renders to Markdown through the standard renderer. This path enables
-   future output formats (HTML, ADF JSON) and consistent rendering.
-
-2. **Direct regex** (``jira_to_markdown()``): Converts directly via regex substitutions.
-   Faster for simple one-shot conversions where the ADF tree isn't needed.
-
-Both produce equivalent Markdown for standard Jira markup.

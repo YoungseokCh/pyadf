@@ -19,7 +19,7 @@ from .exceptions import (
     PyADFError,
     UnsupportedNodeTypeError,
 )
-from .jira import jira_to_markdown, markdown_to_jira
+from .jira import markdown_to_jira
 from .markdown import MarkdownConfig
 
 if TYPE_CHECKING:
@@ -31,7 +31,6 @@ __all__ = [
     "MarkdownConfig",
     "ConversionError",
     "convert_jsonl",
-    "jira_to_markdown",
     "markdown_to_jira",
     "PyADFError",
     "InvalidADFError",

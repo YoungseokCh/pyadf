@@ -1,20 +1,6 @@
-"""Jira wiki markup <-> Markdown conversion."""
+"""Jira wiki markup conversion utilities."""
 
 from . import _core
-
-
-def jira_to_markdown(text: str) -> str:
-    """Convert Jira wiki markup to Markdown.
-
-    Args:
-        text: Text in Jira wiki markup format.
-
-    Returns:
-        Text converted to Markdown format.
-    """
-    if not text:
-        return ""
-    return _core.jira_to_markdown(text)
 
 
 def markdown_to_jira(text: str) -> str:

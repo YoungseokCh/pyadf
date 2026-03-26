@@ -168,11 +168,6 @@ fn parse_jira_str(input: &str) -> ParsedAdf {
 }
 
 #[pyfunction]
-fn jira_to_markdown(input: &str) -> String {
-    jira_markup::jira_to_markdown(input)
-}
-
-#[pyfunction]
 fn markdown_to_jira(input: &str) -> String {
     jira_markup::markdown_to_jira(input)
 }
@@ -187,7 +182,6 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(document_to_markdown, m)?)?;
     m.add_function(wrap_pyfunction!(convert_jsonl_batch, m)?)?;
     m.add_function(wrap_pyfunction!(parse_jira_str, m)?)?;
-    m.add_function(wrap_pyfunction!(jira_to_markdown, m)?)?;
     m.add_function(wrap_pyfunction!(markdown_to_jira, m)?)?;
     Ok(())
 }

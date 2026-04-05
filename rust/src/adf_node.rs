@@ -53,6 +53,10 @@ pub enum NodeKind {
     Mention {
         text: Option<String>,
     },
+    BlockCard {
+        url: Option<String>,
+        data: Option<String>,
+    },
     Unknown,
 }
 
@@ -86,6 +90,7 @@ const SUPPORTED_TYPES: &[&str] = &[
     "status",
     "emoji",
     "mention",
+    "blockCard",
 ];
 
 /// Convert to Vec<String> only when needed (error messages).
@@ -325,6 +330,11 @@ fn build_node_kind(
         "mention" => {
             let text = attr_opt_string(attrs, "text");
             Ok(NodeKind::Mention { text })
+        }
+        "blockCard" => {
+            let url = attr_opt_string(attrs, "url");
+            let data = attr_opt_string(attrs, "data");
+            Ok(NodeKind::BlockCard { url, data })
         }
         _ => Err(AdfError::UnsupportedNodeType {
             node_type: type_str.to_string(),

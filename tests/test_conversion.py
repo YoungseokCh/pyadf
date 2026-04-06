@@ -307,7 +307,7 @@ class TestBlockCard:
             "type": "blockCard",
             "attrs": {"data": '{"title":"Example"}'},
         }
-        assert Document(adf).to_markdown() == "```\n{\"title\":\"Example\"}\n```"
+        assert Document(adf).to_markdown() == '```\n{"title":"Example"}\n```'
 
     def test_broken_block_card(self):
         adf = {

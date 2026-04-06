@@ -17,7 +17,7 @@ A high-performance Python library for converting [Atlassian Document Format (ADF
   - Tables with headers and column spans
   - Code blocks with syntax highlighting
   - Blockquotes and panels
-  - Status badges, inline cards, emoji, mentions
+  - Status badges, inline cards, block cards, emoji, mentions
 - **Type-safe** with comprehensive type hints and Python 3.11+ support
 - **Eager validation** — ADF structure errors surface at construction time, not render time
 - **Robust error handling** with detailed, context-aware error messages
@@ -173,6 +173,7 @@ doc.to_markdown(config)  # [Link text](http://example.com)
 | `emoji` | Unicode emoji | |
 | `hardBreak` | Line break | |
 | `mention` | `@DisplayName` | Jira user mentions |
+| `blockCard` | `[link]` or code block | Link previews |
 
 ## Exception Types
 
@@ -229,11 +230,15 @@ MIT License — see LICENSE file for details.
 
 ## Changelog
 
+### 0.4.2 (Current)
+
+- Add support for (new?) blockCard node type
+
 ### 0.4.1
 
 - Fix linux x86_64 wheel builds
 
-### 0.4.0 (Current)
+### 0.4.0
 
 - Rust core via PyO3 — 5x faster single-doc, 24x faster batch processing
 - New `convert_jsonl()` streaming API for batch JSONL processing

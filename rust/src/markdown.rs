@@ -62,6 +62,9 @@ fn render_node(node: &AdfNode, ctx: &RenderContext, out: &mut String) {
         NodeKind::Status { text } => render_status(text, out),
         NodeKind::Emoji { short_name, text } => render_emoji(short_name, text.as_deref(), out),
         NodeKind::Mention { text } => render_mention(text.as_deref(), out),
+        NodeKind::BlockCard { url, data } => {
+            render_block_card(url.as_deref(), data.as_deref(), out)
+        }
         NodeKind::Unknown => render_children(node, ctx, out),
     }
 }
@@ -321,6 +324,16 @@ fn render_mention(text: Option<&str>, out: &mut String) {
     out.push_str(text.unwrap_or(""));
 }
 
+fn render_block_card(url: Option<&str>, data: Option<&str>, out: &mut String) {
+    if let Some(url) = url {
+        out.push_str(&format!("[{url}]"));
+    } else if let Some(data) = data {
+        out.push_str(&format!("```\n{data}\n```"));
+    } else {
+        out.push_str("<broken_blockcard>");
+    }
+}
+
 // --- Helpers ---
 
 fn is_hard_break(node: &AdfNode) -> bool {
@@ -565,6 +578,18 @@ mod tests {
     fn inline_card_broken() {
         let json = r#"{"type":"inlineCard","attrs":{}}"#;
         assert_eq!(convert(json), "<broken_inlinecard>");
+    }
+
+    #[test]
+    fn block_card_url() {
+        let json = r#"{"type":"blockCard","attrs":{"url":"http://example.com"}}"#;
+        assert_eq!(convert(json), "[http://example.com]");
+    }
+
+    #[test]
+    fn block_card_broken() {
+        let json = r#"{"type":"blockCard","attrs":{}}"#;
+        assert_eq!(convert(json), "<broken_blockcard>");
     }
 
     #[test]

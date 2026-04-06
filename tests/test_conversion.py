@@ -292,3 +292,43 @@ class TestMention:
             "attrs": {"id": "8675309", "text": "@Tommy Tutone", "accessLevel": ""},
         }
         assert Document(adf).to_markdown() == "@Tommy Tutone"
+
+
+class TestBlockCard:
+    def test_with_url(self):
+        adf = {
+            "type": "blockCard",
+            "attrs": {"url": "http://example.com"},
+        }
+        assert Document(adf).to_markdown() == "[http://example.com]"
+
+    def test_with_data(self):
+        adf = {
+            "type": "blockCard",
+            "attrs": {"data": '{"title":"Example"}'},
+        }
+        assert Document(adf).to_markdown() == "```\n{\"title\":\"Example\"}\n```"
+
+    def test_broken_block_card(self):
+        adf = {
+            "type": "blockCard",
+            "attrs": {},
+        }
+        assert Document(adf).to_markdown() == "<broken_blockcard>"
+
+    def test_in_document(self):
+        adf = {
+            "type": "doc",
+            "content": [
+                {"type": "paragraph"},
+                {
+                    "type": "blockCard",
+                    "attrs": {
+                        "url": "https://gitlab.com/redhat/centos-stream/src/kernel/centos-stream-9/-/merge_requests/7939"
+                    },
+                },
+            ],
+        }
+        assert Document(adf).to_markdown() == (
+            "[https://gitlab.com/redhat/centos-stream/src/kernel/centos-stream-9/-/merge_requests/7939]"
+        )

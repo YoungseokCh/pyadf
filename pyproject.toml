@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "pyadf"
-version = "0.4.1"
+version = "0.4.2"
 description = "A Python library for converting Atlassian Document Format (ADF) to Markdown"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -52,3 +52,10 @@ target-version = "py311"
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP"]
 ignore = []
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.408",
+    "pytest>=9.0.2",
+    "ruff>=0.15.9",
+]

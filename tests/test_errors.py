@@ -105,6 +105,15 @@ class TestUnsupportedNodeTypes:
         assert "at:" in str(error)
         assert "paragraph" in str(error).lower()
 
+    def test_known_unsupported_can_error(self):
+        with pytest.raises(UnsupportedNodeTypeError) as exc_info:
+            Document({"type": "extension"}, on_known_unsupported="error")
+        assert 'Unsupported node type "extension"' in str(exc_info.value)
+
+    def test_invalid_known_unsupported_mode(self):
+        with pytest.raises(ValueError, match="on_known_unsupported"):
+            Document({"type": "doc"}, on_known_unsupported="invalid")  # type: ignore[arg-type]
+
 
 class TestInvalidFieldErrors:
     def test_invalid_content_field(self):

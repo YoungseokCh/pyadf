@@ -127,7 +127,18 @@ try:
     doc = Document({"type": "unsupported_type"})
 except UnsupportedNodeTypeError as e:
     print(f"Unsupported node: {e}")
+
+# Known unsupported nodes like "extension" can be skipped or warned on
+doc = Document({"type": "extension"})
+assert doc.to_markdown() == ""
 ```
+
+Known unsupported node handling:
+- `Document(...)` defaults to `on_known_unsupported="warn"` and emits `UserWarning` while skipping known unsupported nodes such as `extension`
+- `Document(..., on_known_unsupported="skip")` silently skips known unsupported nodes
+- `Document(..., on_known_unsupported="error")` raises `UnsupportedNodeTypeError`
+
+The same `on_known_unsupported` option is available on `convert_jsonl(...)`.
 
 ### Customizing Markdown Output
 
@@ -152,6 +163,19 @@ doc.to_markdown(config)  # [Link text](http://example.com)
 |--------|--------|---------|-------------|
 | `bullet_marker` | `+`, `-`, `*` | `+` | Character used for bullet list items |
 | `show_links` | `True`, `False` | `False` | Show underlying links in markdown |
+
+## Known Unsupported Nodes
+
+These node types are recognized but not rendered. By default they are skipped:
+
+- `mediaSingle`
+- `mediaGroup`
+- `mediaInline`
+- `expand`
+- `rule`
+- `media`
+- `embedCard`
+- `extension`
 
 ## Supported ADF Node Types
 

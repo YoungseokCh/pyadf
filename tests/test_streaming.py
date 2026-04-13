@@ -82,6 +82,20 @@ class TestErrorHandling:
         assert isinstance(results[1], ConversionError)
         assert "totallyFake" in results[1].error
 
+    def test_known_unsupported_warns_and_skips(self):
+        lines = ['{"type":"extension"}']
+
+        with pytest.warns(UserWarning, match='Known unsupported node type "extension"'):
+            results = list(convert_jsonl(make_jsonl(lines)))
+
+        assert results == [""]
+
+    def test_known_unsupported_can_error(self):
+        lines = ['{"type":"extension"}']
+
+        with pytest.raises(PyADFError):
+            list(convert_jsonl(make_jsonl(lines), on_error="raise", on_known_unsupported="error"))
+
 
 class TestBatching:
     def test_small_batch_size(self):
@@ -140,3 +154,7 @@ class TestArgValidation:
     def test_invalid_on_error_raises(self):
         with pytest.raises(ValueError, match="on_error"):
             list(convert_jsonl(b"", on_error="invalid"))  # type: ignore[arg-type]
+
+    def test_invalid_on_known_unsupported_raises(self):
+        with pytest.raises(ValueError, match="on_known_unsupported"):
+            list(convert_jsonl(b"", on_known_unsupported="invalid"))  # type: ignore[arg-type]

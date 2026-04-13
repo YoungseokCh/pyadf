@@ -419,15 +419,15 @@ fn apply_formatting(text: &str, symbols: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::adf_node::parse_adf;
+    use crate::adf_node::{parse_adf, KnownUnsupportedMode};
 
     fn convert(json: &str) -> String {
-        let node = parse_adf(json).unwrap();
+        let node = parse_adf(json, KnownUnsupportedMode::Skip).unwrap().node;
         render(&node, &MarkdownConfig::default())
     }
 
     fn convert_with(json: &str, config: &MarkdownConfig) -> String {
-        let node = parse_adf(json).unwrap();
+        let node = parse_adf(json, KnownUnsupportedMode::Skip).unwrap().node;
         render(&node, config)
     }
 

@@ -254,9 +254,9 @@ MIT License — see LICENSE file for details.
 
 ## Changelog
 
-### 0.4.2 (Current)
+### 0.4.2
 
-- Add support for (new?) blockCard node type
+- Add support for blockCard node type
 
 ### 0.4.1
 

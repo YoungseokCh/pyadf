@@ -10,8 +10,8 @@ BulletMarker = Literal["+", "-", "*"]
 class MarkdownConfig:
     """Configuration options for markdown generation."""
 
-    bullet_marker: BulletMarker = "+"
-    show_links: bool = False
+    bullet_marker: BulletMarker = "-"
+    show_links: bool = True
 
     def __post_init__(self) -> None:
         if self.bullet_marker not in ("+", "-", "*"):

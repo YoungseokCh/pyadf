@@ -147,22 +147,25 @@ from pyadf import Document, MarkdownConfig
 
 doc = Document(adf_data)
 
-# Default bullet marker is +
-doc.to_markdown()  # "+ Item 1\n+ Item 2"
+# Default bullet marker is -
+doc.to_markdown()  # "- Item 1\n- Item 2"
 
 # Use * for bullet lists
 config = MarkdownConfig(bullet_marker="*")
 doc.to_markdown(config)  # "* Item 1\n* Item 2"
 
-# Show links with both display text and underlying href
-config = MarkdownConfig(show_links=True)
-doc.to_markdown(config)  # [Link text](http://example.com)
+# Links are shown by default
+doc.to_markdown()  # [Link text](http://example.com)
+
+# Hide underlying href while keeping link text marked
+config = MarkdownConfig(show_links=False)
+doc.to_markdown(config)  # [Link text]
 ```
 
 | Option | Values | Default | Description |
 |--------|--------|---------|-------------|
-| `bullet_marker` | `+`, `-`, `*` | `+` | Character used for bullet list items |
-| `show_links` | `True`, `False` | `False` | Show underlying links in markdown |
+| `bullet_marker` | `+`, `-`, `*` | `-` | Character used for bullet list items |
+| `show_links` | `True`, `False` | `True` | Show underlying links in markdown |
 
 ## Known Unsupported Nodes
 
@@ -185,7 +188,7 @@ These node types are recognized but not rendered. By default they are skipped:
 | `paragraph` | Plain text with newlines | |
 | `text` | Text with optional formatting | Supports bold, italic, links |
 | `heading` | `# Heading` (levels 1-6) | |
-| `bulletList` | `+ Item` | |
+| `bulletList` | `- Item` | |
 | `orderedList` | `1. Item` | |
 | `taskList` | `- [ ] Task` | Checkbox tasks |
 | `codeBlock` | ` ```language\ncode\n``` ` | Optional language syntax |

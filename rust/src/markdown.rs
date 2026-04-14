@@ -456,16 +456,16 @@ mod tests {
     }
 
     #[test]
-    fn link_text_no_show() {
+    fn link_text_show_by_default() {
         let json = r#"{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"click","marks":[{"type":"link","attrs":{"href":"http://example.com/"}}]}]}]}"#;
-        assert_eq!(convert(json), "[click]");
+        assert_eq!(convert(json), "[click](http://example.com/)");
     }
 
     #[test]
-    fn link_text_show() {
+    fn link_text_hide_when_disabled() {
         let json = r#"{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"click","marks":[{"type":"link","attrs":{"href":"http://example.com/"}}]}]}]}"#;
-        let config = MarkdownConfig::new("+", true).unwrap();
-        assert_eq!(convert_with(json, &config), "[click](http://example.com/)");
+        let config = MarkdownConfig::new("-", false).unwrap();
+        assert_eq!(convert_with(json, &config), "[click]");
     }
 
     #[test]
@@ -492,7 +492,7 @@ mod tests {
     #[test]
     fn bullet_list() {
         let json = r#"{"type":"bulletList","content":[{"type":"listItem","content":[{"type":"paragraph","content":[{"type":"text","text":"A"}]}]},{"type":"listItem","content":[{"type":"paragraph","content":[{"type":"text","text":"B"}]}]}]}"#;
-        assert_eq!(convert(json), "+ A\n+ B");
+        assert_eq!(convert(json), "- A\n- B");
     }
 
     #[test]

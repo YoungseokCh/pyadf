@@ -64,7 +64,7 @@ class TestTextFormatting:
         }
         assert Document(adf).to_markdown() == "***Hello!***"
 
-    def test_link_hidden(self):
+    def test_link_shown_by_default(self):
         adf = {
             "type": "paragraph",
             "content": [
@@ -75,9 +75,9 @@ class TestTextFormatting:
                 },
             ],
         }
-        assert Document(adf).to_markdown() == "[This is a link]"
+        assert Document(adf).to_markdown() == "[This is a link](http://example.com/)"
 
-    def test_link_shown(self):
+    def test_link_hidden_when_disabled(self):
         adf = {
             "type": "paragraph",
             "content": [
@@ -88,8 +88,8 @@ class TestTextFormatting:
                 },
             ],
         }
-        config = MarkdownConfig(show_links=True)
-        assert Document(adf).to_markdown(config) == "[This is a link](http://example.com/)"
+        config = MarkdownConfig(show_links=False)
+        assert Document(adf).to_markdown(config) == "[This is a link]"
 
 
 class TestHeadings:
@@ -137,7 +137,7 @@ class TestLists:
                 },
             ],
         }
-        assert Document(adf).to_markdown() == "+ Item 1\n+ Item 2"
+        assert Document(adf).to_markdown() == "- Item 1\n- Item 2"
 
     def test_ordered_list(self):
         adf = {

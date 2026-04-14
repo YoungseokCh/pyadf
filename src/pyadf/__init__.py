@@ -25,7 +25,7 @@ from .markdown import MarkdownConfig
 if TYPE_CHECKING:
     from typing import BinaryIO
 
-__version__ = "0.4.2"
+__version__ = "0.4.3"
 __all__ = [
     "Document",
     "MarkdownConfig",

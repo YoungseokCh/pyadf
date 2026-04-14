@@ -257,6 +257,13 @@ MIT License — see LICENSE file for details.
 
 ## Changelog
 
+### 0.4.3
+
+- Show link targets by default in markdown output
+- Use `-` as the default bullet marker
+- Treat `extension` as a known unsupported node instead of failing by default
+- Add `on_known_unsupported=error|skip|warn` for known unsupported nodes; unknown node types still error
+
 ### 0.4.2
 
 - Add support for blockCard node type

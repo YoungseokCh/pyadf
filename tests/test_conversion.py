@@ -1,6 +1,8 @@
 """Tests for ADF-to-Markdown conversion across all node types."""
 
-from pyadf import Document, MarkdownConfig
+import pytest
+
+from pyadf import Document, MarkdownConfig, UnsupportedNodeTypeError
 
 
 class TestParagraph:
@@ -62,7 +64,7 @@ class TestTextFormatting:
         }
         assert Document(adf).to_markdown() == "***Hello!***"
 
-    def test_link_hidden(self):
+    def test_link_shown_by_default(self):
         adf = {
             "type": "paragraph",
             "content": [
@@ -73,9 +75,9 @@ class TestTextFormatting:
                 },
             ],
         }
-        assert Document(adf).to_markdown() == "[This is a link]"
+        assert Document(adf).to_markdown() == "[This is a link](http://example.com/)"
 
-    def test_link_shown(self):
+    def test_link_hidden_when_disabled(self):
         adf = {
             "type": "paragraph",
             "content": [
@@ -86,8 +88,8 @@ class TestTextFormatting:
                 },
             ],
         }
-        config = MarkdownConfig(show_links=True)
-        assert Document(adf).to_markdown(config) == "[This is a link](http://example.com/)"
+        config = MarkdownConfig(show_links=False)
+        assert Document(adf).to_markdown(config) == "[This is a link]"
 
 
 class TestHeadings:
@@ -135,7 +137,7 @@ class TestLists:
                 },
             ],
         }
-        assert Document(adf).to_markdown() == "+ Item 1\n+ Item 2"
+        assert Document(adf).to_markdown() == "- Item 1\n- Item 2"
 
     def test_ordered_list(self):
         adf = {
@@ -332,3 +334,34 @@ class TestBlockCard:
         assert Document(adf).to_markdown() == (
             "[https://gitlab.com/redhat/centos-stream/src/kernel/centos-stream-9/-/merge_requests/7939]"
         )
+
+
+class TestKnownUnsupportedNodes:
+    def test_extension_warns_by_default(self):
+        adf = {
+            "type": "doc",
+            "content": [
+                {"type": "paragraph", "content": [{"type": "text", "text": "Before"}]},
+                {
+                    "type": "extension",
+                    "attrs": {
+                        "extensionType": "com.atlassian.confluence.macro.core",
+                        "extensionKey": "toc",
+                    },
+                },
+                {"type": "paragraph", "content": [{"type": "text", "text": "After"}]},
+            ],
+        }
+
+        with pytest.warns(UserWarning, match='Known unsupported node type "extension"'):
+            assert Document(adf).to_markdown() == "Before\n\nAfter"
+
+    def test_extension_can_error(self):
+        with pytest.raises(UnsupportedNodeTypeError):
+            Document({"type": "extension"}, on_known_unsupported="error")
+
+    def test_extension_can_warn(self):
+        with pytest.warns(UserWarning, match='Known unsupported node type "extension"'):
+            doc = Document({"type": "extension"}, on_known_unsupported="warn")
+
+        assert doc.to_markdown() == ""

@@ -26,8 +26,8 @@ impl MarkdownConfig {
 impl Default for MarkdownConfig {
     fn default() -> Self {
         Self {
-            bullet_marker: "+".to_string(),
-            show_links: false,
+            bullet_marker: "-".to_string(),
+            show_links: true,
         }
     }
 }
@@ -46,7 +46,7 @@ pub struct PyMarkdownConfig {
 #[pymethods]
 impl PyMarkdownConfig {
     #[new]
-    #[pyo3(signature = (bullet_marker="+", show_links=false))]
+    #[pyo3(signature = (bullet_marker="-", show_links=true))]
     fn new(bullet_marker: &str, show_links: bool) -> PyResult<Self> {
         match bullet_marker {
             "+" | "-" | "*" => Ok(Self {

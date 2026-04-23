@@ -269,6 +269,11 @@ MIT License — see LICENSE file for details.
 
 ## Changelog
 
+### 0.5.0
+
+- Move `on_known_unsupported=error|skip|warn|html` from `Document(...)` construction to `Document(...).to_markdown(...)`
+- Add `on_known_unsupported="html"` to render known unsupported nodes as invisible HTML fallback elements
+
 ### 0.4.3
 
 - Show link targets by default in markdown output

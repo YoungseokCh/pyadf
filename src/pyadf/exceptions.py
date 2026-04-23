@@ -212,3 +212,11 @@ class InvalidInputError(PyADFError):
         message += "\n  Hint: Document() accepts JSON string, dict, or None"
 
         super().__init__(message)
+
+
+class MarkdownParseError(PyADFError):
+    """Raised when Markdown input cannot be parsed into supported ADF."""
+
+    def __init__(self, message: str) -> None:
+        self.parse_message = message
+        super().__init__(message)

@@ -1,0 +1,130 @@
+"""Tests for Markdown -> ADF parsing and roundtrip."""
+
+import pytest
+
+from pyadf import Document, MarkdownParseError, markdown_to_adf
+
+
+class TestToAdf:
+    def test_existing_document_can_serialize_to_adf(self):
+        adf = {
+            "type": "doc",
+            "content": [
+                {"type": "paragraph", "content": [{"type": "text", "text": "Hello"}]},
+            ],
+        }
+
+        assert Document(adf).to_adf() == adf
+
+
+class TestFromMarkdown:
+    def test_simple_paragraph(self):
+        assert Document.from_markdown("Hello").to_adf() == {
+            "type": "doc",
+            "content": [
+                {"type": "paragraph", "content": [{"type": "text", "text": "Hello"}]},
+            ],
+        }
+
+    def test_heading(self):
+        assert Document.from_markdown("# Title").to_adf() == {
+            "type": "doc",
+            "content": [
+                {
+                    "type": "heading",
+                    "attrs": {"level": 1},
+                    "content": [{"type": "text", "text": "Title"}],
+                }
+            ],
+        }
+
+    def test_strong_and_emphasis(self):
+        assert Document.from_markdown("***Hi***").to_adf() == {
+            "type": "doc",
+            "content": [
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Hi",
+                            "marks": [{"type": "strong"}, {"type": "em"}],
+                        }
+                    ],
+                }
+            ],
+        }
+
+    def test_link(self):
+        assert Document.from_markdown("[x](http://example.com)").to_adf() == {
+            "type": "doc",
+            "content": [
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "x",
+                            "marks": [
+                                {"type": "link", "attrs": {"href": "http://example.com"}}
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+
+    def test_ordered_list(self):
+        assert Document.from_markdown("1. A\n2. B").to_adf() == {
+            "type": "doc",
+            "content": [
+                {
+                    "type": "orderedList",
+                    "content": [
+                        {
+                            "type": "listItem",
+                            "content": [
+                                {
+                                    "type": "paragraph",
+                                    "content": [{"type": "text", "text": "A"}],
+                                }
+                            ],
+                        },
+                        {
+                            "type": "listItem",
+                            "content": [
+                                {
+                                    "type": "paragraph",
+                                    "content": [{"type": "text", "text": "B"}],
+                                }
+                            ],
+                        },
+                    ],
+                }
+            ],
+        }
+
+    def test_markdown_to_adf_helper(self):
+        assert markdown_to_adf("Hello") == Document.from_markdown("Hello").to_adf()
+
+    def test_rejects_html(self):
+        with pytest.raises(MarkdownParseError):
+            Document.from_markdown("<div>hello</div>")
+
+
+class TestRoundtrip:
+    @pytest.mark.parametrize(
+        "markdown",
+        [
+            "Hello",
+            "# Title",
+            "Hello, **world!**",
+            "[x](http://example.com)",
+            "- A\n- B",
+            "1. A\n2. B",
+            "> Quote",
+            "```python\nprint('hello')\n```",
+        ],
+    )
+    def test_markdown_roundtrip_for_canonical_subset(self, markdown):
+        assert Document.from_markdown(markdown).to_markdown() == markdown

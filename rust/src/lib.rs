@@ -2,9 +2,11 @@ use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList, PyNone, PyString};
 
 mod adf_node;
+mod adf_serialize;
 mod config;
 mod errors;
 mod markdown;
+mod markdown_parse;
 
 /// Convert a Python dict/list/scalar to serde_json::Value without going through JSON text.
 fn py_to_json_value(obj: &Bound<'_, PyAny>) -> PyResult<serde_json::Value> {
@@ -43,6 +45,37 @@ fn py_to_json_value(obj: &Bound<'_, PyAny>) -> PyResult<serde_json::Value> {
         Err(pyo3::exceptions::PyTypeError::new_err(format!(
             "Cannot convert Python type '{type_name}' to JSON value"
         )))
+    }
+}
+
+fn json_value_to_py(py: Python<'_>, value: &serde_json::Value) -> PyResult<PyObject> {
+    match value {
+        serde_json::Value::Null => Ok(py.None()),
+        serde_json::Value::Bool(v) => Ok(PyBool::new(py, *v).to_owned().into_any().unbind()),
+        serde_json::Value::Number(v) => {
+            if let Some(i) = v.as_i64() {
+                Ok(i.into_pyobject(py)?.into_any().unbind())
+            } else if let Some(f) = v.as_f64() {
+                Ok(f.into_pyobject(py)?.into_any().unbind())
+            } else {
+                Err(pyo3::exceptions::PyValueError::new_err("Unsupported JSON number"))
+            }
+        }
+        serde_json::Value::String(v) => Ok(v.into_pyobject(py)?.into_any().unbind()),
+        serde_json::Value::Array(values) => {
+            let list = PyList::empty(py);
+            for value in values {
+                list.append(json_value_to_py(py, value)?)?;
+            }
+            Ok(list.into_any().unbind())
+        }
+        serde_json::Value::Object(values) => {
+            let dict = PyDict::new(py);
+            for (key, value) in values {
+                dict.set_item(key, json_value_to_py(py, value)?)?;
+            }
+            Ok(dict.into_any().unbind())
+        }
     }
 }
 
@@ -88,6 +121,18 @@ fn parse_adf_dict(py: Python<'_>, adf_dict: &Bound<'_, PyAny>) -> PyResult<Parse
     let value = py_to_json_value(adf_dict)?;
     let parsed = adf_node::parse_adf_value(&value, "").map_err(|e| errors::to_py_err(py, &e))?;
     Ok(ParsedAdf { node: parsed.node })
+}
+
+#[pyfunction]
+fn parse_markdown_str(py: Python<'_>, markdown: &str) -> PyResult<ParsedAdf> {
+    let node = markdown_parse::parse_markdown(markdown).map_err(|e| errors::to_py_err(py, &e))?;
+    Ok(ParsedAdf { node })
+}
+
+#[pyfunction]
+fn parsed_adf_to_dict(py: Python<'_>, parsed: &ParsedAdf) -> PyResult<PyObject> {
+    let value = adf_serialize::to_value(&parsed.node);
+    json_value_to_py(py, &value)
 }
 
 /// Render a previously parsed ADF tree to markdown.
@@ -204,6 +249,8 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<config::PyMarkdownConfig>()?;
     m.add_function(wrap_pyfunction!(parse_adf_str, m)?)?;
     m.add_function(wrap_pyfunction!(parse_adf_dict, m)?)?;
+    m.add_function(wrap_pyfunction!(parse_markdown_str, m)?)?;
+    m.add_function(wrap_pyfunction!(parsed_adf_to_dict, m)?)?;
     m.add_function(wrap_pyfunction!(render_markdown, m)?)?;
     m.add_function(wrap_pyfunction!(document_to_markdown, m)?)?;
     m.add_function(wrap_pyfunction!(convert_jsonl_batch, m)?)?;

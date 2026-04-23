@@ -68,6 +68,18 @@ class Document:
                 actual_type=type(adf).__name__,
             )
 
+    @classmethod
+    def from_markdown(cls, markdown: str) -> "Document":
+        if not isinstance(markdown, str):
+            raise InvalidInputError(
+                expected_type="str",
+                actual_type=type(markdown).__name__,
+            )
+
+        doc = cls()
+        doc._parsed = _core.parse_markdown_str(markdown)
+        return doc
+
     def to_markdown(
         self,
         config: MarkdownConfig | None = None,
@@ -114,3 +126,12 @@ class Document:
                     stacklevel=2,
                 )
         return markdown
+
+    def to_adf(self) -> dict:
+        if self._parsed is None:
+            return {"type": "doc", "content": []}
+
+        adf = _core.parsed_adf_to_dict(self._parsed)
+        if not isinstance(adf, dict):  # pragma: no cover
+            raise TypeError("parsed_adf_to_dict() must return dict")
+        return adf

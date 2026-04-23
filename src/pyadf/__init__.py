@@ -1,4 +1,4 @@
-"""pyadf - A Python library for converting Atlassian Document Format (ADF) to Markdown."""
+"""pyadf - A Python library for converting Atlassian Document Format (ADF) and Markdown."""
 
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ from .exceptions import (
     InvalidFieldError,
     InvalidInputError,
     InvalidJSONError,
+    MarkdownParseError,
     MissingFieldError,
     NodeCreationError,
     PyADFError,
@@ -31,10 +32,12 @@ __all__ = [
     "MarkdownConfig",
     "ConversionError",
     "convert_jsonl",
+    "markdown_to_adf",
     "PyADFError",
     "InvalidADFError",
     "InvalidJSONError",
     "InvalidInputError",
+    "MarkdownParseError",
     "MissingFieldError",
     "InvalidFieldError",
     "UnsupportedNodeTypeError",
@@ -156,3 +159,8 @@ def convert_jsonl(
     finally:
         if should_close:
             stream.close()
+
+
+def markdown_to_adf(markdown: str) -> dict:
+    """Convert Markdown text to canonical ADF dict."""
+    return Document.from_markdown(markdown).to_adf()

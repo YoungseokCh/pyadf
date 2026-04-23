@@ -65,6 +65,20 @@ doc = Document(adf_json)
 markdown = doc.to_markdown()
 ```
 
+### Parsing Markdown to ADF
+
+```python
+from pyadf import Document, markdown_to_adf
+
+doc = Document.from_markdown("# Hello\n\nThis is **bold**.")
+adf = doc.to_adf()
+
+adf2 = markdown_to_adf("1. First\n2. Second")
+```
+
+The Markdown importer is currently strict and targets the canonical subset that
+pyadf already renders well.
+
 ### Converting Individual Nodes
 
 ```python
@@ -179,6 +193,25 @@ doc.to_markdown(config)  # [Link text]
 | `bullet_marker` | `+`, `-`, `*` | `-` | Character used for bullet list items |
 | `show_links` | `True`, `False` | `True` | Show underlying links in markdown |
 
+## Supported Markdown Import Subset
+
+`Document.from_markdown(...)` and `markdown_to_adf(...)` currently support a
+small, strict subset of Markdown:
+
+- Paragraphs
+- ATX headings (`#` through `######`)
+- Bold / italic / bold+italic
+- Inline links
+- Bullet and ordered lists
+- Blockquotes
+- Fenced code blocks
+- GFM tables
+- pyadf HTML fallback elements such as `<div adf="extension" ...></div>`
+
+The importer intentionally rejects many other Markdown forms for now (for
+example generic HTML), so roundtrip behavior stays deterministic while the
+feature set is being expanded.
+
 ## Known Unsupported Nodes
 
 These node types are recognized but not rendered. By default they are skipped:
@@ -273,6 +306,9 @@ MIT License — see LICENSE file for details.
 
 - Move `on_known_unsupported=error|skip|warn|html` from `Document(...)` construction to `Document(...).to_markdown(...)`
 - Add `on_known_unsupported="html"` to render known unsupported nodes as invisible HTML fallback elements
+- Add `Document.from_markdown(...)` for strict Markdown -> ADF parsing
+- Add `Document.to_adf()` for exporting canonical ADF dictionaries
+- Add initial Markdown/ADF roundtrip tests
 
 ### 0.4.3
 

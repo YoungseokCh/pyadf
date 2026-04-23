@@ -128,15 +128,27 @@ try:
 except UnsupportedNodeTypeError as e:
     print(f"Unsupported node: {e}")
 
-# Known unsupported nodes like "extension" can be skipped or warned on
+# Known unsupported nodes like "extension" can be skipped, warned on, error, or preserved as HTML at render time
 doc = Document({"type": "extension"})
 assert doc.to_markdown() == ""
+
+doc = Document(
+    {
+        "type": "extension",
+        "attrs": {"extensionKey": "toc", "extensionType": "com.atlassian.confluence.macro.core"},
+    }
+)
+assert doc.to_markdown(on_known_unsupported="html") == (
+    '<div adf="extension" '
+    'params=\'{"extensionKey":"toc","extensionType":"com.atlassian.confluence.macro.core"}\'></div>'
+)
 ```
 
 Known unsupported node handling:
-- `Document(...)` defaults to `on_known_unsupported="warn"` and emits `UserWarning` while skipping known unsupported nodes such as `extension`
-- `Document(..., on_known_unsupported="skip")` silently skips known unsupported nodes
-- `Document(..., on_known_unsupported="error")` raises `UnsupportedNodeTypeError`
+- `Document(...).to_markdown()` defaults to `on_known_unsupported="warn"` and emits `UserWarning` while skipping known unsupported nodes such as `extension`
+- `Document(...).to_markdown(on_known_unsupported="skip")` silently skips known unsupported nodes
+- `Document(...).to_markdown(on_known_unsupported="error")` raises `UnsupportedNodeTypeError`
+- `Document(...).to_markdown(on_known_unsupported="html")` preserves known unsupported nodes as invisible HTML fallback elements like `<div adf="extension" params='...'></div>` (or `<span ...></span>` in inline/cell contexts)
 
 The same `on_known_unsupported` option is available on `convert_jsonl(...)`.
 

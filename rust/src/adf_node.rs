@@ -6,10 +6,11 @@ pub enum KnownUnsupportedMode {
     Error,
     Skip,
     Warn,
+    Html,
 }
 
 #[derive(Debug, Clone)]
-pub struct SkippedNode {
+pub struct KnownUnsupportedNode {
     pub node_type: String,
     pub node_path: String,
 }
@@ -17,7 +18,6 @@ pub struct SkippedNode {
 #[derive(Debug, Clone)]
 pub struct ParseResult {
     pub node: AdfNode,
-    pub skipped_nodes: Vec<SkippedNode>,
 }
 
 /// A text formatting mark.
@@ -76,7 +76,11 @@ pub enum NodeKind {
         url: Option<String>,
         data: Option<String>,
     },
-    Unknown,
+    KnownUnsupported {
+        node_type: String,
+        node_path: String,
+        params: Option<String>,
+    },
 }
 
 /// An ADF node: tree structure (children) + type-specific data (kind).
@@ -129,11 +133,8 @@ const KNOWN_UNSUPPORTED: &[&str] = &[
     "extension",
 ];
 
-/// Parse a JSON string into an ADF node tree with known-unsupported policy.
-pub fn parse_adf(
-    json: &str,
-    known_unsupported_mode: KnownUnsupportedMode,
-) -> Result<ParseResult, AdfError> {
+/// Parse a JSON string into an ADF node tree.
+pub fn parse_adf(json: &str) -> Result<ParseResult, AdfError> {
     let value: Value = serde_json::from_str(json).map_err(|e| {
         // Compute absolute byte offset from line/column.
         // serde_json reports 1-based line and column numbers.
@@ -144,23 +145,15 @@ pub fn parse_adf(
         }
     })?;
 
-    parse_adf_value(&value, "", known_unsupported_mode)
+    parse_adf_value(&value, "")
 }
 
-/// Parse a pre-built serde_json::Value into an ADF node tree with known-unsupported policy.
-pub fn parse_adf_value(
-    value: &Value,
-    node_path: &str,
-    known_unsupported_mode: KnownUnsupportedMode,
-) -> Result<ParseResult, AdfError> {
+/// Parse a pre-built serde_json::Value into an ADF node tree.
+pub fn parse_adf_value(value: &Value, node_path: &str) -> Result<ParseResult, AdfError> {
     match value {
         Value::Object(_) => {
-            let mut skipped_nodes = Vec::new();
-            let node = parse_node(value, node_path, known_unsupported_mode, &mut skipped_nodes)?;
-            Ok(ParseResult {
-                node,
-                skipped_nodes,
-            })
+            let node = parse_node(value, node_path)?;
+            Ok(ParseResult { node })
         }
         _ => Err(AdfError::InvalidInput {
             expected_type: "JSON object, dict, or None".to_string(),
@@ -194,12 +187,7 @@ fn json_type_name(v: &Value) -> &'static str {
     }
 }
 
-fn parse_node(
-    value: &Value,
-    node_path: &str,
-    known_unsupported_mode: KnownUnsupportedMode,
-    skipped_nodes: &mut Vec<SkippedNode>,
-) -> Result<AdfNode, AdfError> {
+fn parse_node(value: &Value, node_path: &str) -> Result<AdfNode, AdfError> {
     let obj = value.as_object().ok_or_else(|| AdfError::InvalidField {
         field_name: "node".to_string(),
         invalid_value: json_type_name(value).to_string(),
@@ -233,27 +221,14 @@ fn parse_node(
     validate_attrs(obj, &current_path)?;
 
     // Parse children
-    let children = parse_children(
-        obj,
-        type_str,
-        &current_path,
-        known_unsupported_mode,
-        skipped_nodes,
-    )?;
+    let children = parse_children(obj, type_str, &current_path)?;
 
     // Build NodeKind from type string + obj fields (reads attrs by reference, no clone)
     let attrs = obj
         .get("attrs")
         .and_then(|v| v.as_object())
         .unwrap_or(&EMPTY_MAP);
-    let kind = build_node_kind(
-        type_str,
-        attrs,
-        obj,
-        &current_path,
-        known_unsupported_mode,
-        skipped_nodes,
-    )?;
+    let kind = build_node_kind(type_str, attrs, obj, &current_path)?;
 
     Ok(AdfNode { kind, children })
 }
@@ -279,8 +254,6 @@ fn parse_children(
     obj: &serde_json::Map<String, Value>,
     type_str: &str,
     node_path: &str,
-    known_unsupported_mode: KnownUnsupportedMode,
-    skipped_nodes: &mut Vec<SkippedNode>,
 ) -> Result<Vec<AdfNode>, AdfError> {
     match obj.get("content") {
         Some(Value::Array(arr)) => {
@@ -300,12 +273,7 @@ fn parse_children(
                 } else {
                     format!("{node_path} > {type_str}[{idx}]")
                 };
-                kids.push(parse_node(
-                    child_val,
-                    &child_path,
-                    known_unsupported_mode,
-                    skipped_nodes,
-                )?);
+                kids.push(parse_node(child_val, &child_path)?);
             }
             Ok(kids)
         }
@@ -325,25 +293,13 @@ fn build_node_kind(
     attrs: &serde_json::Map<String, Value>,
     obj: &serde_json::Map<String, Value>,
     current_path: &str,
-    known_unsupported_mode: KnownUnsupportedMode,
-    skipped_nodes: &mut Vec<SkippedNode>,
 ) -> Result<NodeKind, AdfError> {
     if KNOWN_UNSUPPORTED.contains(&type_str) {
-        return match known_unsupported_mode {
-            KnownUnsupportedMode::Error => Err(AdfError::UnsupportedNodeType {
-                node_type: type_str.to_string(),
-                node_path: Some(current_path.to_string()),
-                supported_types: Some(supported_type_strings()),
-            }),
-            KnownUnsupportedMode::Skip => Ok(NodeKind::Unknown),
-            KnownUnsupportedMode::Warn => {
-                skipped_nodes.push(SkippedNode {
-                    node_type: type_str.to_string(),
-                    node_path: current_path.to_string(),
-                });
-                Ok(NodeKind::Unknown)
-            }
-        };
+        return Ok(NodeKind::KnownUnsupported {
+            node_type: type_str.to_string(),
+            node_path: current_path.to_string(),
+            params: serialize_params(attrs),
+        });
     }
 
     match type_str {
@@ -439,6 +395,14 @@ fn attr_u32(attrs: &serde_json::Map<String, Value>, key: &str, default: u32) -> 
         .unwrap_or(default)
 }
 
+fn serialize_params(attrs: &serde_json::Map<String, Value>) -> Option<String> {
+    if attrs.is_empty() {
+        return None;
+    }
+
+    serde_json::to_string(attrs).ok()
+}
+
 fn parse_marks(
     obj: &serde_json::Map<String, Value>,
     node_path: &str,
@@ -500,7 +464,7 @@ mod tests {
     #[test]
     fn parse_simple_paragraph() {
         let json = r#"{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Hello"}]}]}"#;
-        let node = parse_adf(json, KnownUnsupportedMode::Skip).unwrap().node;
+        let node = parse_adf(json).unwrap().node;
         assert!(matches!(node.kind, NodeKind::Doc));
         assert_eq!(node.children.len(), 1);
         assert!(matches!(node.children[0].kind, NodeKind::Paragraph));
@@ -512,7 +476,7 @@ mod tests {
 
     #[test]
     fn parse_invalid_json() {
-        let result = parse_adf("not json", KnownUnsupportedMode::Skip);
+        let result = parse_adf("not json");
         assert!(result.is_err());
         match result.unwrap_err() {
             AdfError::InvalidJson { .. } => {}
@@ -522,7 +486,7 @@ mod tests {
 
     #[test]
     fn parse_missing_type() {
-        let result = parse_adf(r#"{"content":[]}"#, KnownUnsupportedMode::Skip);
+        let result = parse_adf(r#"{"content":[]}"#);
         assert!(result.is_err());
         match result.unwrap_err() {
             AdfError::MissingField { field_name, .. } => assert_eq!(field_name, "type"),
@@ -532,7 +496,7 @@ mod tests {
 
     #[test]
     fn parse_unsupported_type() {
-        let result = parse_adf(r#"{"type":"totallyFake"}"#, KnownUnsupportedMode::Skip);
+        let result = parse_adf(r#"{"type":"totallyFake"}"#);
         assert!(result.is_err());
         match result.unwrap_err() {
             AdfError::UnsupportedNodeType { node_type, .. } => {
@@ -543,44 +507,60 @@ mod tests {
     }
 
     #[test]
-    fn parse_known_unsupported_silently() {
+    fn parse_known_unsupported_preserves_node() {
         let json = r#"{"type":"doc","content":[{"type":"mediaSingle"}]}"#;
-        let node = parse_adf(json, KnownUnsupportedMode::Skip).unwrap().node;
+        let node = parse_adf(json).unwrap().node;
         assert_eq!(node.children.len(), 1);
-        assert!(matches!(node.children[0].kind, NodeKind::Unknown));
+        assert!(matches!(node.children[0].kind, NodeKind::KnownUnsupported { .. }));
     }
 
     #[test]
     fn parse_extension_as_known_unsupported() {
         let json = r#"{"type":"doc","content":[{"type":"extension"}]}"#;
-        let node = parse_adf(json, KnownUnsupportedMode::Skip).unwrap().node;
+        let node = parse_adf(json).unwrap().node;
         assert_eq!(node.children.len(), 1);
-        assert!(matches!(node.children[0].kind, NodeKind::Unknown));
+        assert!(matches!(node.children[0].kind, NodeKind::KnownUnsupported { .. }));
     }
 
     #[test]
-    fn parse_known_unsupported_warn_collects_skipped_node() {
+    fn parse_known_unsupported_preserves_node_path() {
         let json = r#"{"type":"extension"}"#;
-        let result = parse_adf(json, KnownUnsupportedMode::Warn).unwrap();
-        assert_eq!(result.skipped_nodes.len(), 1);
-        assert_eq!(result.skipped_nodes[0].node_type, "extension");
-        assert_eq!(result.skipped_nodes[0].node_path, "extension");
+        let result = parse_adf(json).unwrap();
+        match result.node.kind {
+            NodeKind::KnownUnsupported {
+                node_type,
+                node_path,
+                ..
+            } => {
+                assert_eq!(node_type, "extension");
+                assert_eq!(node_path, "extension");
+            }
+            other => panic!("Expected KnownUnsupported, got: {other:?}"),
+        }
     }
 
     #[test]
-    fn parse_known_unsupported_error_mode_raises() {
-        let result = parse_adf(r#"{"type":"extension"}"#, KnownUnsupportedMode::Error);
-        assert!(result.is_err());
-        match result.unwrap_err() {
-            AdfError::UnsupportedNodeType { node_type, .. } => assert_eq!(node_type, "extension"),
-            other => panic!("Expected UnsupportedNodeType, got: {other:?}"),
+    fn parse_known_unsupported_preserves_node_metadata() {
+        let result = parse_adf(r#"{"type":"extension","attrs":{"extensionKey":"toc"}}"#).unwrap();
+
+        match result.node.kind {
+            NodeKind::KnownUnsupported {
+                node_type,
+                node_path,
+                params,
+            } => {
+                assert_eq!(node_type, "extension");
+                assert_eq!(node_path, "extension");
+                assert_eq!(params.as_deref(), Some(r#"{"extensionKey":"toc"}"#));
+            }
+            other => panic!("Expected KnownUnsupported, got: {other:?}"),
         }
     }
 
     #[test]
     fn parse_bold_text() {
         let json = r#"{"type":"text","text":"bold","marks":[{"type":"strong"}]}"#;
-        let node = parse_adf(json, KnownUnsupportedMode::Skip).unwrap().node;
+        let node = parse_adf(json).unwrap().node;
         match &node.kind {
             NodeKind::Text { marks, .. } => {
                 assert_eq!(marks.len(), 1);
@@ -593,7 +573,7 @@ mod tests {
     #[test]
     fn parse_link_text() {
         let json = r#"{"type":"text","text":"click","marks":[{"type":"link","attrs":{"href":"http://example.com"}}]}"#;
-        let node = parse_adf(json, KnownUnsupportedMode::Skip).unwrap().node;
+        let node = parse_adf(json).unwrap().node;
         match &node.kind {
             NodeKind::Text { marks, .. } => {
                 assert_eq!(marks[0].mark_type, "link");
@@ -607,7 +587,7 @@ mod tests {
     fn parse_heading() {
         let json =
             r#"{"type":"heading","attrs":{"level":2},"content":[{"type":"text","text":"Title"}]}"#;
-        let node = parse_adf(json, KnownUnsupportedMode::Skip).unwrap().node;
+        let node = parse_adf(json).unwrap().node;
         match &node.kind {
             NodeKind::Heading { level } => assert_eq!(*level, 2),
             other => panic!("Expected Heading, got: {other:?}"),
@@ -616,10 +596,7 @@ mod tests {
 
     #[test]
     fn parse_invalid_attrs() {
-        let result = parse_adf(
-            r#"{"type":"doc","attrs":"bad"}"#,
-            KnownUnsupportedMode::Skip,
-        );
+        let result = parse_adf(r#"{"type":"doc","attrs":"bad"}"#);
         assert!(result.is_err());
         match result.unwrap_err() {
             AdfError::InvalidField { field_name, .. } => assert_eq!(field_name, "attrs"),
@@ -629,10 +606,7 @@ mod tests {
 
     #[test]
     fn parse_invalid_content() {
-        let result = parse_adf(
-            r#"{"type":"doc","content":"bad"}"#,
-            KnownUnsupportedMode::Skip,
-        );
+        let result = parse_adf(r#"{"type":"doc","content":"bad"}"#);
         assert!(result.is_err());
         match result.unwrap_err() {
             AdfError::InvalidField { field_name, .. } => assert_eq!(field_name, "content"),
@@ -642,10 +616,7 @@ mod tests {
 
     #[test]
     fn parse_invalid_marks() {
-        let result = parse_adf(
-            r#"{"type":"text","text":"x","marks":"bad"}"#,
-            KnownUnsupportedMode::Skip,
-        );
+        let result = parse_adf(r#"{"type":"text","text":"x","marks":"bad"}"#);
         assert!(result.is_err());
         match result.unwrap_err() {
             AdfError::InvalidField { field_name, .. } => assert_eq!(field_name, "marks"),

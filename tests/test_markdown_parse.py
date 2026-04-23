@@ -111,6 +111,50 @@ class TestFromMarkdown:
         with pytest.raises(MarkdownParseError):
             Document.from_markdown("<div>hello</div>")
 
+    def test_parses_block_html_fallback_for_known_unsupported(self):
+        markdown = (
+            '<div adf="extension" '
+            'params=\'{"extensionKey":"toc","extensionType":"com.atlassian.confluence.macro.core"}\'></div>'
+        )
+
+        assert Document.from_markdown(markdown).to_adf() == {
+            "type": "doc",
+            "content": [
+                {
+                    "type": "extension",
+                    "attrs": {
+                        "extensionKey": "toc",
+                        "extensionType": "com.atlassian.confluence.macro.core",
+                    },
+                }
+            ],
+        }
+
+    def test_parses_inline_html_fallback_for_known_unsupported(self):
+        markdown = (
+            'Before <span adf="extension" '
+            'params=\'{"extensionKey":"toc","extensionType":"com.atlassian.confluence.macro.core"}\'></span>'
+        )
+
+        assert Document.from_markdown(markdown).to_adf() == {
+            "type": "doc",
+            "content": [
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {"type": "text", "text": "Before "},
+                        {
+                            "type": "extension",
+                            "attrs": {
+                                "extensionKey": "toc",
+                                "extensionType": "com.atlassian.confluence.macro.core",
+                            },
+                        },
+                    ],
+                }
+            ],
+        }
+
 
 class TestRoundtrip:
     @pytest.mark.parametrize(
@@ -128,3 +172,7 @@ class TestRoundtrip:
     )
     def test_markdown_roundtrip_for_canonical_subset(self, markdown):
         assert Document.from_markdown(markdown).to_markdown() == markdown
+
+    def test_html_fallback_roundtrip_with_html_mode(self):
+        markdown = '<div adf="extension" params=\'{"extensionKey":"toc"}\'></div>'
+        assert Document.from_markdown(markdown).to_markdown(on_known_unsupported="html") == markdown

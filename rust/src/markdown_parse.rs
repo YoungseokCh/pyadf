@@ -23,6 +23,7 @@ struct ParseState {
     stack: Vec<Frame>,
     marks: Vec<Mark>,
     link_href: Option<String>,
+    pending_html: Option<PendingHtml>,
 }
 
 impl ParseState {
@@ -31,6 +32,7 @@ impl ParseState {
             stack: vec![Frame::new(NodeKind::Doc)],
             marks: Vec::new(),
             link_href: None,
+            pending_html: None,
         }
     }
 
@@ -81,16 +83,49 @@ impl ParseState {
                 Ok(())
             }
             Event::Rule => Err(markdown_error("thematic breaks are not supported yet")),
-            Event::Html(_) | Event::InlineHtml(_) => {
-                Err(markdown_error("HTML markdown is not supported yet"))
+            Event::Html(raw) | Event::InlineHtml(raw) => {
+                self.handle_html(raw.as_ref())
             }
             _ => Err(markdown_error("unsupported markdown syntax")),
         }
     }
 
+    fn handle_html(&mut self, raw: &str) -> Result<(), AdfError> {
+        if let Some(node) = parse_known_unsupported_html(raw) {
+            self.push_child(node);
+            return Ok(());
+        }
+
+        if let Some(pending) = parse_known_unsupported_html_open(raw) {
+            self.pending_html = Some(pending);
+            return Ok(());
+        }
+
+        if let Some(pending) = &self.pending_html {
+            if html_close_tag(raw, &pending.tag) {
+                let pending = self
+                    .pending_html
+                    .take()
+                    .ok_or_else(|| markdown_error("invalid HTML fallback state"))?;
+                self.push_child(AdfNode {
+                    kind: NodeKind::KnownUnsupported {
+                        node_type: pending.node_type.clone(),
+                        node_path: pending.node_type,
+                        params: pending.params,
+                    },
+                    children: Vec::new(),
+                });
+                return Ok(());
+            }
+        }
+
+        Err(markdown_error("HTML markdown is not supported yet"))
+    }
+
     fn start(&mut self, tag: Tag<'_>) -> Result<(), AdfError> {
         match tag {
             Tag::Paragraph => self.push_frame(NodeKind::Paragraph),
+            Tag::HtmlBlock => Ok(()),
             Tag::Heading { level, .. } => self.push_frame(NodeKind::Heading {
                 level: heading_level(level),
             }),
@@ -145,6 +180,7 @@ impl ParseState {
             | TagEnd::Table
             | TagEnd::TableRow
             | TagEnd::TableCell => self.pop_frame(),
+            TagEnd::HtmlBlock => Ok(()),
             TagEnd::TableHead => Ok(()),
             TagEnd::Emphasis | TagEnd::Strong => {
                 self.marks.pop();
@@ -234,6 +270,12 @@ struct Frame {
     children: Vec<AdfNode>,
 }
 
+struct PendingHtml {
+    tag: String,
+    node_type: String,
+    params: Option<String>,
+}
+
 impl Frame {
     fn new(kind: NodeKind) -> Self {
         Self {
@@ -280,6 +322,70 @@ fn markdown_error(message: &str) -> AdfError {
     AdfError::MarkdownParse {
         message: message.to_string(),
     }
+}
+
+fn parse_known_unsupported_html(raw: &str) -> Option<AdfNode> {
+    let raw = raw.trim();
+    let tag = if raw.starts_with("<div ") {
+        "div"
+    } else if raw.starts_with("<span ") {
+        "span"
+    } else {
+        return None;
+    };
+
+    let close = format!("</{tag}>");
+    if !raw.ends_with(&close) {
+        return None;
+    }
+
+    let adf_type = extract_attr(raw, "adf", '"')?;
+    let params = extract_attr(raw, "params", '\'').map(html_unescape_attr);
+
+    Some(AdfNode {
+        kind: NodeKind::KnownUnsupported {
+            node_type: adf_type.clone(),
+            node_path: adf_type,
+            params,
+        },
+        children: Vec::new(),
+    })
+}
+
+fn parse_known_unsupported_html_open(raw: &str) -> Option<PendingHtml> {
+    let raw = raw.trim();
+    let tag = if raw.starts_with("<div ") && raw.ends_with('>') {
+        "div"
+    } else if raw.starts_with("<span ") && raw.ends_with('>') {
+        "span"
+    } else {
+        return None;
+    };
+
+    let node_type = extract_attr(raw, "adf", '"')?;
+    let params = extract_attr(raw, "params", '\'').map(html_unescape_attr);
+
+    Some(PendingHtml {
+        tag: tag.to_string(),
+        node_type,
+        params,
+    })
+}
+
+fn extract_attr(raw: &str, name: &str, quote: char) -> Option<String> {
+    let pattern = format!("{name}={quote}");
+    let start = raw.find(&pattern)? + pattern.len();
+    let rest = &raw[start..];
+    let end = rest.find(quote)?;
+    Some(rest[..end].to_string())
+}
+
+fn html_unescape_attr(value: String) -> String {
+    value.replace("&amp;", "&").replace("&#39;", "'")
+}
+
+fn html_close_tag(raw: &str, tag: &str) -> bool {
+    raw.trim() == format!("</{tag}>")
 }
 
 fn is_block_node(node: &AdfNode) -> bool {

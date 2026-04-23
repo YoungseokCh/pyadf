@@ -1,4 +1,4 @@
-"""Tests for Markdown -> ADF parsing and roundtrip."""
+"""Tests for Markdown -> ADF direct parsing and MD roundtrip."""
 
 import pytest
 
@@ -74,6 +74,36 @@ class TestFromMarkdown:
             ],
         }
 
+    def test_bullet_list(self):
+        assert Document.from_markdown("- A\n- B").to_adf() == {
+            "type": "doc",
+            "content": [
+                {
+                    "type": "bulletList",
+                    "content": [
+                        {
+                            "type": "listItem",
+                            "content": [
+                                {
+                                    "type": "paragraph",
+                                    "content": [{"type": "text", "text": "A"}],
+                                }
+                            ],
+                        },
+                        {
+                            "type": "listItem",
+                            "content": [
+                                {
+                                    "type": "paragraph",
+                                    "content": [{"type": "text", "text": "B"}],
+                                }
+                            ],
+                        },
+                    ],
+                }
+            ],
+        }
+
     def test_ordered_list(self):
         assert Document.from_markdown("1. A\n2. B").to_adf() == {
             "type": "doc",
@@ -97,6 +127,80 @@ class TestFromMarkdown:
                                     "type": "paragraph",
                                     "content": [{"type": "text", "text": "B"}],
                                 }
+                            ],
+                        },
+                    ],
+                }
+            ],
+        }
+
+    def test_hard_break(self):
+        assert Document.from_markdown("A  \nB").to_adf() == {
+            "type": "doc",
+            "content": [
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {"type": "text", "text": "A"},
+                        {"type": "hardBreak"},
+                        {"type": "text", "text": "B"},
+                    ],
+                }
+            ],
+        }
+
+    def test_blockquote_two_paragraphs(self):
+        assert Document.from_markdown("> A\n>\n> B").to_adf() == {
+            "type": "doc",
+            "content": [
+                {
+                    "type": "blockquote",
+                    "content": [
+                        {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "A"}],
+                        },
+                        {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "B"}],
+                        },
+                    ],
+                }
+            ],
+        }
+
+    @pytest.mark.xfail(strict=True, reason="table header parsing not implemented yet")
+    def test_table(self):
+        assert Document.from_markdown("| A | B |\n| --- | --- |\n| C | D |").to_adf() == {
+            "type": "doc",
+            "content": [
+                {
+                    "type": "table",
+                    "content": [
+                        {
+                            "type": "tableRow",
+                            "content": [
+                                {
+                                    "type": "tableHeader",
+                                    "content": [{"type": "text", "text": "A"}],
+                                },
+                                {
+                                    "type": "tableHeader",
+                                    "content": [{"type": "text", "text": "B"}],
+                                },
+                            ],
+                        },
+                        {
+                            "type": "tableRow",
+                            "content": [
+                                {
+                                    "type": "tableCell",
+                                    "content": [{"type": "text", "text": "C"}],
+                                },
+                                {
+                                    "type": "tableCell",
+                                    "content": [{"type": "text", "text": "D"}],
+                                },
                             ],
                         },
                     ],
@@ -164,9 +268,11 @@ class TestRoundtrip:
             "# Title",
             "Hello, **world!**",
             "[x](http://example.com)",
+            "A  \nB",
             "- A\n- B",
             "1. A\n2. B",
             "> Quote",
+            "> A\n>\n> B",
             "```python\nprint('hello')\n```",
         ],
     )
@@ -176,3 +282,8 @@ class TestRoundtrip:
     def test_html_fallback_roundtrip_with_html_mode(self):
         markdown = '<div adf="extension" params=\'{"extensionKey":"toc"}\'></div>'
         assert Document.from_markdown(markdown).to_markdown(on_known_unsupported="html") == markdown
+
+    @pytest.mark.xfail(strict=True, reason="table header roundtrip not implemented yet")
+    def test_table_roundtrip_for_canonical_subset(self):
+        markdown = "| A | B |\n| --- | --- |\n| C | D |"
+        assert Document.from_markdown(markdown).to_markdown() == markdown

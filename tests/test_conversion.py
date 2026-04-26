@@ -390,7 +390,10 @@ class TestKnownUnsupportedNodes:
                         {
                             "type": "tableCell",
                             "content": [
-                                {"type": "paragraph", "content": [{"type": "text", "text": "Before "}]},
+                                {
+                                    "type": "paragraph",
+                                    "content": [{"type": "text", "text": "Before "}],
+                                },
                                 {
                                     "type": "extension",
                                     "attrs": {
@@ -406,6 +409,7 @@ class TestKnownUnsupportedNodes:
         }
 
         assert Document(adf).to_markdown(on_known_unsupported="html") == (
-            "| Before <span adf=\"extension\" "
-            'params=\'{"extensionKey":"toc","extensionType":"com.atlassian.confluence.macro.core"}\'></span> |'
+            '| Before <span adf="extension" '
+            'params=\'{"extensionKey":"toc",'
+            '"extensionType":"com.atlassian.confluence.macro.core"}\'></span> |'
         )

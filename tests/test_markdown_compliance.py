@@ -63,7 +63,10 @@ class TestMarkdownCompliance:
                                 {
                                     "type": "tableCell",
                                     "content": [
-                                        {"type": "paragraph", "content": [{"type": "text", "text": "Before "}]},
+                                        {
+                                            "type": "paragraph",
+                                            "content": [{"type": "text", "text": "Before "}],
+                                        },
                                         {"type": "extension", "attrs": {"extensionKey": "toc"}},
                                     ],
                                 }

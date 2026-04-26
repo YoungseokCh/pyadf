@@ -86,7 +86,8 @@ def convert_jsonl(
         raise ValueError(f"on_error must be 'raise', 'skip', or 'include', got {on_error!r}")
     if on_known_unsupported not in ("error", "skip", "warn", "html"):
         raise ValueError(
-            f"on_known_unsupported must be 'error', 'skip', 'warn', or 'html', got {on_known_unsupported!r}"
+            "on_known_unsupported must be 'error', 'skip', 'warn', or 'html', "
+            f"got {on_known_unsupported!r}"
         )
 
     rust_config = None

@@ -1,7 +1,5 @@
 """Expanded direct Markdown -> ADF parse tests."""
 
-import pytest
-
 from pyadf import Document
 
 
@@ -23,9 +21,7 @@ class TestDirectParsePass:
             "content": [
                 {
                     "type": "paragraph",
-                    "content": [
-                        {"type": "text", "text": "x", "marks": [{"type": "strong"}]}
-                    ],
+                    "content": [{"type": "text", "text": "x", "marks": [{"type": "strong"}]}],
                 }
             ],
         }
@@ -37,9 +33,7 @@ class TestDirectParsePass:
                 {
                     "type": "heading",
                     "attrs": {"level": 2},
-                    "content": [
-                        {"type": "text", "text": "Title", "marks": [{"type": "strong"}]}
-                    ],
+                    "content": [{"type": "text", "text": "Title", "marks": [{"type": "strong"}]}],
                 }
             ],
         }
@@ -75,9 +69,7 @@ class TestDirectParsePass:
                         {
                             "type": "text",
                             "text": "http://e.com",
-                            "marks": [
-                                {"type": "link", "attrs": {"href": "http://e.com"}}
-                            ],
+                            "marks": [{"type": "link", "attrs": {"href": "http://e.com"}}],
                         }
                     ],
                 }
@@ -258,8 +250,7 @@ class TestDirectParsePass:
 
     def test_html_fallback_unescapes_params(self):
         markdown = (
-            '<div adf="extension" '
-            'params=\'{"text":"Tom &amp; Jerry","value":"it&#39;s"}\'></div>'
+            '<div adf="extension" params=\'{"text":"Tom &amp; Jerry","value":"it&#39;s"}\'></div>'
         )
         assert Document.from_markdown(markdown).to_adf() == {
             "type": "doc",

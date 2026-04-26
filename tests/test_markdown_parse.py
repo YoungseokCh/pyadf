@@ -65,9 +65,7 @@ class TestFromMarkdown:
                         {
                             "type": "text",
                             "text": "x",
-                            "marks": [
-                                {"type": "link", "attrs": {"href": "http://example.com"}}
-                            ],
+                            "marks": [{"type": "link", "attrs": {"href": "http://example.com"}}],
                         }
                     ],
                 }
@@ -169,7 +167,6 @@ class TestFromMarkdown:
             ],
         }
 
-    @pytest.mark.xfail(strict=True, reason="table header parsing not implemented yet")
     def test_table(self):
         assert Document.from_markdown("| A | B |\n| --- | --- |\n| C | D |").to_adf() == {
             "type": "doc",
@@ -283,7 +280,6 @@ class TestRoundtrip:
         markdown = '<div adf="extension" params=\'{"extensionKey":"toc"}\'></div>'
         assert Document.from_markdown(markdown).to_markdown(on_known_unsupported="html") == markdown
 
-    @pytest.mark.xfail(strict=True, reason="table header roundtrip not implemented yet")
     def test_table_roundtrip_for_canonical_subset(self):
         markdown = "| A | B |\n| --- | --- |\n| C | D |"
         assert Document.from_markdown(markdown).to_markdown() == markdown

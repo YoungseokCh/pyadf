@@ -84,6 +84,104 @@ class TestDirectParsePass:
             ],
         }
 
+    def test_inline_code_maps_to_code_mark(self):
+        assert Document.from_markdown("`code`").to_adf() == {
+            "type": "doc",
+            "content": [
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "code",
+                            "marks": [{"type": "code"}],
+                        }
+                    ],
+                }
+            ],
+        }
+
+    def test_linked_inline_code_uses_code_and_link_marks(self):
+        assert Document.from_markdown("[`code`](http://e.com)").to_adf() == {
+            "type": "doc",
+            "content": [
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "code",
+                            "marks": [
+                                {"type": "code"},
+                                {"type": "link", "attrs": {"href": "http://e.com"}},
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+
+    def test_strikethrough_maps_to_strike_mark(self):
+        assert Document.from_markdown("~~x~~").to_adf() == {
+            "type": "doc",
+            "content": [
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "x",
+                            "marks": [{"type": "strike"}],
+                        }
+                    ],
+                }
+            ],
+        }
+
+    def test_unchecked_task_list_maps_to_todo_task_item(self):
+        assert Document.from_markdown("- [ ] task").to_adf() == {
+            "type": "doc",
+            "content": [
+                {
+                    "type": "taskList",
+                    "content": [
+                        {
+                            "type": "taskItem",
+                            "attrs": {"state": "TODO"},
+                            "content": [
+                                {
+                                    "type": "paragraph",
+                                    "content": [{"type": "text", "text": "task"}],
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+
+    def test_checked_task_list_maps_to_done_task_item(self):
+        assert Document.from_markdown("- [x] task").to_adf() == {
+            "type": "doc",
+            "content": [
+                {
+                    "type": "taskList",
+                    "content": [
+                        {
+                            "type": "taskItem",
+                            "attrs": {"state": "DONE"},
+                            "content": [
+                                {
+                                    "type": "paragraph",
+                                    "content": [{"type": "text", "text": "task"}],
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+
     def test_code_block_with_blank_lines(self):
         assert Document.from_markdown("```\na\n\nb\n```").to_adf() == {
             "type": "doc",

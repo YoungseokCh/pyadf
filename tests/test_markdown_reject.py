@@ -27,9 +27,6 @@ class TestMarkdownReject:
     @pytest.mark.parametrize(
         "markdown",
         [
-            "`code`",
-            "~~x~~",
-            "- [ ] task",
             '<div adf="extension">',
             '<div adf="extension" params=\'{"bad":}\'></div>',
         ],

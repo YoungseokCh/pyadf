@@ -39,9 +39,14 @@ pub enum NodeKind {
     HardBreak,
     BulletList,
     OrderedList,
-    TaskList,
+    TaskList {
+        local_id: Option<String>,
+    },
     ListItem,
-    TaskItem,
+    TaskItem {
+        local_id: Option<String>,
+        state: Option<String>,
+    },
     Panel,
     Blockquote,
     Table,
@@ -317,9 +322,14 @@ fn build_node_kind(
         "hardBreak" => Ok(NodeKind::HardBreak),
         "bulletList" => Ok(NodeKind::BulletList),
         "orderedList" => Ok(NodeKind::OrderedList),
-        "taskList" => Ok(NodeKind::TaskList),
+        "taskList" => Ok(NodeKind::TaskList {
+            local_id: attr_opt_string(attrs, "localId"),
+        }),
         "listItem" => Ok(NodeKind::ListItem),
-        "taskItem" => Ok(NodeKind::TaskItem),
+        "taskItem" => Ok(NodeKind::TaskItem {
+            local_id: attr_opt_string(attrs, "localId"),
+            state: attr_opt_string(attrs, "state"),
+        }),
         "panel" => Ok(NodeKind::Panel),
         "blockquote" => Ok(NodeKind::Blockquote),
         "table" => Ok(NodeKind::Table),
@@ -511,7 +521,10 @@ mod tests {
         let json = r#"{"type":"doc","content":[{"type":"mediaSingle"}]}"#;
         let node = parse_adf(json).unwrap().node;
         assert_eq!(node.children.len(), 1);
-        assert!(matches!(node.children[0].kind, NodeKind::KnownUnsupported { .. }));
+        assert!(matches!(
+            node.children[0].kind,
+            NodeKind::KnownUnsupported { .. }
+        ));
     }
 
     #[test]
@@ -519,7 +532,10 @@ mod tests {
         let json = r#"{"type":"doc","content":[{"type":"extension"}]}"#;
         let node = parse_adf(json).unwrap().node;
         assert_eq!(node.children.len(), 1);
-        assert!(matches!(node.children[0].kind, NodeKind::KnownUnsupported { .. }));
+        assert!(matches!(
+            node.children[0].kind,
+            NodeKind::KnownUnsupported { .. }
+        ));
     }
 
     #[test]

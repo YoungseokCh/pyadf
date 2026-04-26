@@ -176,6 +176,57 @@ class TestAdfRoundtripExact:
         assert reparsed == adf
 
 
+class TestTaskAdfAttrs:
+    def test_task_attrs_are_preserved_in_to_adf(self):
+        adf = {
+            "type": "doc",
+            "content": [
+                {
+                    "type": "taskList",
+                    "attrs": {"localId": "list-1"},
+                    "content": [
+                        {
+                            "type": "taskItem",
+                            "attrs": {"localId": "item-1", "state": "DONE"},
+                            "content": [
+                                {
+                                    "type": "paragraph",
+                                    "content": [{"type": "text", "text": "Task"}],
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+
+        assert Document(adf).to_adf() == adf
+
+    def test_task_item_state_controls_markdown_checkbox(self):
+        adf = {
+            "type": "doc",
+            "content": [
+                {
+                    "type": "taskList",
+                    "content": [
+                        {
+                            "type": "taskItem",
+                            "attrs": {"state": "DONE"},
+                            "content": [
+                                {
+                                    "type": "paragraph",
+                                    "content": [{"type": "text", "text": "Task"}],
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+
+        assert Document(adf).to_markdown() == "- [x] Task"
+
+
 class TestAdfRoundtripMarkdownStable:
     def test_panel_roundtrips_markdown_as_blockquote(self):
         adf = {

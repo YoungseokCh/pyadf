@@ -81,8 +81,8 @@ fn render_node(
         }
         NodeKind::BulletList => render_bullet_list(node, ctx, out, state),
         NodeKind::OrderedList => render_ordered_list(node, ctx, out, state),
-        NodeKind::TaskList => render_task_list(node, ctx, out, state),
-        NodeKind::ListItem | NodeKind::TaskItem => render_list_item(node, ctx, out, state),
+        NodeKind::TaskList { .. } => render_task_list(node, ctx, out, state),
+        NodeKind::ListItem | NodeKind::TaskItem { .. } => render_list_item(node, ctx, out, state),
         NodeKind::Panel => render_panel(node, ctx, out, state),
         NodeKind::Blockquote => render_blockquote(node, ctx, out, state),
         NodeKind::Table => render_table(node, ctx, out, state),
@@ -118,9 +118,15 @@ fn render_node(
             node_type,
             node_path,
             params,
-        } => {
-            render_known_unsupported(node_type, node_path, params.as_deref(), node, ctx, out, state)
-        }
+        } => render_known_unsupported(
+            node_type,
+            node_path,
+            params.as_deref(),
+            node,
+            ctx,
+            out,
+            state,
+        ),
     }
 }
 
@@ -175,15 +181,23 @@ fn render_text(text: &str, marks: &[crate::adf_node::Mark], ctx: &RenderContext,
 
     let is_bold = marks.iter().any(|m| m.mark_type == "strong");
     let is_italic = marks.iter().any(|m| m.mark_type == "em");
+    let is_code = marks.iter().any(|m| m.mark_type == "code");
+    let is_strike = marks.iter().any(|m| m.mark_type == "strike");
     let link_mark = marks.iter().find(|m| m.mark_type == "link");
 
     let mut formatted = text.to_string();
 
-    if is_bold {
+    if is_code {
+        formatted = apply_inline_code(&formatted);
+    }
+    if is_bold && !is_code {
         formatted = apply_formatting(&formatted, "**");
     }
-    if is_italic {
+    if is_italic && !is_code {
         formatted = apply_formatting(&formatted, "*");
+    }
+    if is_strike && !is_code {
+        formatted = apply_formatting(&formatted, "~~");
     }
     if let Some(mark) = link_mark {
         formatted = format!("[{formatted}]");
@@ -249,7 +263,11 @@ fn render_task_list(
         let mut item_out = String::new();
         let child_ctx = child_context(ctx, ParentKind::TaskList, false, false);
         render_node(child, &child_ctx, &mut item_out, state)?;
-        items.push(format!("- [ ] {item_out}"));
+        let marker = match &child.kind {
+            NodeKind::TaskItem { state, .. } if state.as_deref() == Some("DONE") => "[x]",
+            _ => "[ ]",
+        };
+        items.push(format!("- {marker} {item_out}"));
     }
     out.push_str(&items.join("\n"));
     Ok(())
@@ -610,8 +628,8 @@ fn parent_kind_of(kind: &NodeKind) -> Option<ParentKind> {
         NodeKind::Paragraph => Some(ParentKind::Paragraph),
         NodeKind::BulletList => Some(ParentKind::BulletList),
         NodeKind::OrderedList => Some(ParentKind::OrderedList),
-        NodeKind::TaskList => Some(ParentKind::TaskList),
-        NodeKind::ListItem | NodeKind::TaskItem => Some(ParentKind::ListItem),
+        NodeKind::TaskList { .. } => Some(ParentKind::TaskList),
+        NodeKind::ListItem | NodeKind::TaskItem { .. } => Some(ParentKind::ListItem),
         NodeKind::Heading { .. } => Some(ParentKind::Heading),
         NodeKind::Panel => Some(ParentKind::Panel),
         NodeKind::Blockquote => Some(ParentKind::Blockquote),
@@ -629,16 +647,24 @@ fn apply_formatting(text: &str, symbols: &str) -> String {
     format!("{symbols}{trimmed}{symbols}{spaces}")
 }
 
+fn apply_inline_code(text: &str) -> String {
+    format!("`{text}`")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::adf_node::{KnownUnsupportedMode, parse_adf};
+    use crate::adf_node::{parse_adf, KnownUnsupportedMode};
 
     fn convert(json: &str) -> String {
         let node = parse_adf(json).unwrap().node;
-        render(&node, &MarkdownConfig::default(), KnownUnsupportedMode::Skip)
-            .unwrap()
-            .markdown
+        render(
+            &node,
+            &MarkdownConfig::default(),
+            KnownUnsupportedMode::Skip,
+        )
+        .unwrap()
+        .markdown
     }
 
     fn convert_with(json: &str, config: &MarkdownConfig) -> String {
@@ -664,6 +690,24 @@ mod tests {
     fn italic_text() {
         let json = r#"{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"italic","marks":[{"type":"em"}]}]}]}"#;
         assert_eq!(convert(json), "*italic*");
+    }
+
+    #[test]
+    fn inline_code_text() {
+        let json = r#"{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"code","marks":[{"type":"code"}]}]}]}"#;
+        assert_eq!(convert(json), "`code`");
+    }
+
+    #[test]
+    fn linked_inline_code_text() {
+        let json = r#"{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"code","marks":[{"type":"code"},{"type":"link","attrs":{"href":"http://e.com"}}]}]}]}"#;
+        assert_eq!(convert(json), "[`code`](http://e.com)");
+    }
+
+    #[test]
+    fn strikethrough_text() {
+        let json = r#"{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"strike","marks":[{"type":"strike"}]}]}]}"#;
+        assert_eq!(convert(json), "~~strike~~");
     }
 
     #[test]

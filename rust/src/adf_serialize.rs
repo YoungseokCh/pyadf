@@ -1,5 +1,5 @@
 use crate::adf_node::{AdfNode, Mark, NodeKind};
-use serde_json::{Map, Value, json};
+use serde_json::{json, Map, Value};
 
 pub fn to_value(node: &AdfNode) -> Value {
     let mut obj = Map::new();
@@ -28,9 +28,15 @@ pub fn to_value(node: &AdfNode) -> Value {
         }
         NodeKind::BulletList => container(&mut obj, "bulletList", &node.children),
         NodeKind::OrderedList => container(&mut obj, "orderedList", &node.children),
-        NodeKind::TaskList => container(&mut obj, "taskList", &node.children),
+        NodeKind::TaskList { local_id } => {
+            container(&mut obj, "taskList", &node.children);
+            insert_attrs(&mut obj, task_list_attrs(local_id));
+        }
         NodeKind::ListItem => container(&mut obj, "listItem", &node.children),
-        NodeKind::TaskItem => container(&mut obj, "taskItem", &node.children),
+        NodeKind::TaskItem { local_id, state } => {
+            container(&mut obj, "taskItem", &node.children);
+            insert_attrs(&mut obj, task_item_attrs(local_id, state));
+        }
         NodeKind::Panel => container(&mut obj, "panel", &node.children),
         NodeKind::Blockquote => container(&mut obj, "blockquote", &node.children),
         NodeKind::Table => container(&mut obj, "table", &node.children),
@@ -85,9 +91,7 @@ pub fn to_value(node: &AdfNode) -> Value {
             insert_attrs(&mut obj, card_attrs(url, data));
         }
         NodeKind::KnownUnsupported {
-            node_type,
-            params,
-            ..
+            node_type, params, ..
         } => {
             obj.insert("type".to_string(), json!(node_type));
             if let Some(attrs) = parse_params(params) {
@@ -136,6 +140,25 @@ fn card_attrs(url: &Option<String>, data: &Option<String>) -> Map<String, Value>
     }
     if let Some(data) = data {
         attrs.insert("data".to_string(), json!(data));
+    }
+    attrs
+}
+
+fn task_list_attrs(local_id: &Option<String>) -> Map<String, Value> {
+    let mut attrs = Map::new();
+    if let Some(local_id) = local_id {
+        attrs.insert("localId".to_string(), json!(local_id));
+    }
+    attrs
+}
+
+fn task_item_attrs(local_id: &Option<String>, state: &Option<String>) -> Map<String, Value> {
+    let mut attrs = Map::new();
+    if let Some(local_id) = local_id {
+        attrs.insert("localId".to_string(), json!(local_id));
+    }
+    if let Some(state) = state {
+        attrs.insert("state".to_string(), json!(state));
     }
     attrs
 }

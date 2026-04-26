@@ -16,6 +16,8 @@ pub fn parse_markdown(markdown: &str) -> Result<AdfNode, AdfError> {
 fn markdown_options() -> Options {
     let mut options = Options::empty();
     options.insert(Options::ENABLE_TABLES);
+    options.insert(Options::ENABLE_STRIKETHROUGH);
+    options.insert(Options::ENABLE_TASKLISTS);
     options
 }
 
@@ -59,7 +61,7 @@ impl ParseState {
                 self.push_child(AdfNode {
                     kind: NodeKind::Text {
                         text: text.to_string(),
-                        marks: self.active_marks(),
+                        marks: self.active_code_marks()?,
                     },
                     children: Vec::new(),
                 });
@@ -82,10 +84,9 @@ impl ParseState {
                 });
                 Ok(())
             }
+            Event::TaskListMarker(checked) => self.mark_current_item_as_task(checked),
             Event::Rule => Err(markdown_error("thematic breaks are not supported yet")),
-            Event::Html(raw) | Event::InlineHtml(raw) => {
-                self.handle_html(raw.as_ref())
-            }
+            Event::Html(raw) | Event::InlineHtml(raw) => self.handle_html(raw.as_ref()),
             _ => Err(markdown_error("unsupported markdown syntax")),
         }
     }
@@ -150,6 +151,13 @@ impl ParseState {
                 });
                 Ok(())
             }
+            Tag::Strikethrough => {
+                self.marks.push(Mark {
+                    mark_type: "strike".to_string(),
+                    href: None,
+                });
+                Ok(())
+            }
             Tag::Link {
                 link_type,
                 dest_url,
@@ -187,7 +195,7 @@ impl ParseState {
             | TagEnd::TableCell => self.pop_frame(),
             TagEnd::HtmlBlock => Ok(()),
             TagEnd::TableHead => Ok(()),
-            TagEnd::Emphasis | TagEnd::Strong => {
+            TagEnd::Emphasis | TagEnd::Strong | TagEnd::Strikethrough => {
                 self.marks.pop();
                 Ok(())
             }
@@ -231,10 +239,31 @@ impl ParseState {
         marks.sort_by_key(|mark| match mark.mark_type.as_str() {
             "strong" => 0,
             "em" => 1,
-            "link" => 2,
+            "strike" => 2,
+            "link" => 3,
             _ => 3,
         });
         marks
+    }
+
+    fn active_code_marks(&self) -> Result<Vec<Mark>, AdfError> {
+        if !self.marks.is_empty() {
+            return Err(markdown_error(
+                "inline code can only be combined with links",
+            ));
+        }
+
+        let mut marks = vec![Mark {
+            mark_type: "code".to_string(),
+            href: None,
+        }];
+        if let Some(href) = &self.link_href {
+            marks.push(Mark {
+                mark_type: "link".to_string(),
+                href: Some(href.clone()),
+            });
+        }
+        Ok(marks)
     }
 
     fn in_code_block(&self) -> bool {
@@ -245,7 +274,10 @@ impl ParseState {
     }
 
     fn current_table_row_is_header(&self) -> bool {
-        self.stack.iter().rev().any(|frame| matches!(frame.kind, NodeKind::TableRow))
+        self.stack
+            .iter()
+            .rev()
+            .any(|frame| matches!(frame.kind, NodeKind::TableRow))
             && self
                 .stack
                 .iter()
@@ -253,6 +285,30 @@ impl ParseState {
                 .find(|frame| matches!(frame.kind, NodeKind::Table))
                 .map(|table| table.children.is_empty())
                 .unwrap_or(false)
+    }
+
+    fn mark_current_item_as_task(&mut self, checked: bool) -> Result<(), AdfError> {
+        let item = self
+            .stack
+            .last_mut()
+            .ok_or_else(|| markdown_error("task marker outside list item"))?;
+        if !matches!(item.kind, NodeKind::ListItem) {
+            return Err(markdown_error("task marker outside list item"));
+        }
+
+        item.kind = NodeKind::TaskItem {
+            local_id: None,
+            state: Some(if checked { "DONE" } else { "TODO" }.to_string()),
+        };
+
+        let list = self
+            .stack
+            .iter_mut()
+            .rev()
+            .find(|frame| matches!(frame.kind, NodeKind::BulletList))
+            .ok_or_else(|| markdown_error("task marker outside bullet list"))?;
+        list.kind = NodeKind::TaskList { local_id: None };
+        Ok(())
     }
 
     fn finish(mut self) -> Result<AdfNode, AdfError> {
@@ -298,6 +354,11 @@ impl Frame {
                     children,
                 }]
             }
+            NodeKind::TaskItem { .. } if children.first().is_some_and(is_block_node) => children,
+            NodeKind::TaskItem { .. } => vec![AdfNode {
+                kind: NodeKind::Paragraph,
+                children,
+            }],
             _ => children,
         };
 
@@ -330,9 +391,9 @@ fn reject_unsupported_link_type(link_type: LinkType) -> Result<(), AdfError> {
         | LinkType::Collapsed
         | LinkType::CollapsedUnknown
         | LinkType::Shortcut
-        | LinkType::ShortcutUnknown => {
-            Err(markdown_error("reference-style links are not supported yet"))
-        }
+        | LinkType::ShortcutUnknown => Err(markdown_error(
+            "reference-style links are not supported yet",
+        )),
         _ => Ok(()),
     }
 }
@@ -414,9 +475,9 @@ fn is_block_node(node: &AdfNode) -> bool {
             | NodeKind::Heading { .. }
             | NodeKind::BulletList
             | NodeKind::OrderedList
-            | NodeKind::TaskList
+            | NodeKind::TaskList { .. }
             | NodeKind::ListItem
-            | NodeKind::TaskItem
+            | NodeKind::TaskItem { .. }
             | NodeKind::Panel
             | NodeKind::Blockquote
             | NodeKind::Table

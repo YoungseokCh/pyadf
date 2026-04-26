@@ -58,7 +58,9 @@ fn json_value_to_py(py: Python<'_>, value: &serde_json::Value) -> PyResult<PyObj
             } else if let Some(f) = v.as_f64() {
                 Ok(f.into_pyobject(py)?.into_any().unbind())
             } else {
-                Err(pyo3::exceptions::PyValueError::new_err("Unsupported JSON number"))
+                Err(pyo3::exceptions::PyValueError::new_err(
+                    "Unsupported JSON number",
+                ))
             }
         }
         serde_json::Value::String(v) => Ok(v.into_pyobject(py)?.into_any().unbind()),
@@ -149,7 +151,8 @@ fn render_markdown(
         None => config::MarkdownConfig::default(),
     };
     let mode = parse_known_unsupported_mode(on_known_unsupported)?;
-    let outcome = markdown::render(&parsed.node, &cfg, mode).map_err(|e| errors::to_py_err(py, &e))?;
+    let outcome =
+        markdown::render(&parsed.node, &cfg, mode).map_err(|e| errors::to_py_err(py, &e))?;
     Ok((
         outcome.markdown,
         outcome
@@ -179,7 +182,8 @@ fn document_to_markdown(
     };
     let mode = parse_known_unsupported_mode(on_known_unsupported)?;
     let parsed = adf_node::parse_adf(json).map_err(|e| errors::to_py_err(py, &e))?;
-    let outcome = markdown::render(&parsed.node, &cfg, mode).map_err(|e| errors::to_py_err(py, &e))?;
+    let outcome =
+        markdown::render(&parsed.node, &cfg, mode).map_err(|e| errors::to_py_err(py, &e))?;
     Ok(outcome.markdown)
 }
 

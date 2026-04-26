@@ -96,6 +96,16 @@ class TestErrorHandling:
         with pytest.raises(PyADFError):
             list(convert_jsonl(make_jsonl(lines), on_error="raise", on_known_unsupported="error"))
 
+    def test_known_unsupported_can_render_as_html(self):
+        lines = [
+            '{"type":"extension","attrs":{"extensionKey":"toc","extensionType":"com.atlassian.confluence.macro.core"}}'
+        ]
+
+        assert list(convert_jsonl(make_jsonl(lines), on_known_unsupported="html")) == [
+            '<div adf="extension" '
+            'params=\'{"extensionKey":"toc","extensionType":"com.atlassian.confluence.macro.core"}\'></div>'
+        ]
+
 
 class TestBatching:
     def test_small_batch_size(self):

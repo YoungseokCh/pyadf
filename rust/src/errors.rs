@@ -36,6 +36,8 @@ pub enum AdfError {
     },
     /// Invalid configuration.
     InvalidConfig { message: String },
+    /// Markdown parsing failed or hit unsupported syntax.
+    MarkdownParse { message: String },
 }
 
 impl fmt::Display for AdfError {
@@ -129,6 +131,9 @@ impl fmt::Display for AdfError {
             }
             AdfError::InvalidConfig { message } => {
                 write!(f, "{message}")
+            }
+            AdfError::MarkdownParse { message } => {
+                write!(f, "Markdown parse error: {message}")
             }
         }
     }
@@ -225,6 +230,13 @@ pub fn to_py_err(py: pyo3::Python<'_>, err: &AdfError) -> pyo3::PyErr {
             let _ = kwargs.set_item("node_path", node_path.as_deref());
             let _ = kwargs.set_item("supported_types", supported_types.as_ref());
             match cls.call((), Some(&kwargs)) {
+                Ok(inst) => pyo3::PyErr::from_value(inst.into_any()),
+                Err(_) => pyo3::exceptions::PyValueError::new_err(err.to_string()),
+            }
+        }
+        AdfError::MarkdownParse { message } => {
+            let cls = exceptions.getattr("MarkdownParseError").unwrap();
+            match cls.call1((message.as_str(),)) {
                 Ok(inst) => pyo3::PyErr::from_value(inst.into_any()),
                 Err(_) => pyo3::exceptions::PyValueError::new_err(err.to_string()),
             }

@@ -65,6 +65,23 @@ doc = Document(adf_json)
 markdown = doc.to_markdown()
 ```
 
+### Parsing Markdown to ADF
+
+```python
+from pyadf import Document, markdown_to_adf
+
+doc = Document.from_markdown("# Hello\n\nThis is **bold**.")
+adf = doc.to_adf()
+
+adf2 = markdown_to_adf("1. First\n2. Second")
+```
+
+The Markdown importer is currently strict and targets the canonical subset that
+pyadf already renders well.
+
+Detailed ADF element and Markdown import policy lives in
+[`docs/jira-adf-element-policy.md`](docs/jira-adf-element-policy.md).
+
 ### Converting Individual Nodes
 
 ```python
@@ -128,15 +145,27 @@ try:
 except UnsupportedNodeTypeError as e:
     print(f"Unsupported node: {e}")
 
-# Known unsupported nodes like "extension" can be skipped or warned on
+# Known unsupported nodes like "extension" can be skipped, warned on, error, or preserved as HTML at render time
 doc = Document({"type": "extension"})
 assert doc.to_markdown() == ""
+
+doc = Document(
+    {
+        "type": "extension",
+        "attrs": {"extensionKey": "toc", "extensionType": "com.atlassian.confluence.macro.core"},
+    }
+)
+assert doc.to_markdown(on_known_unsupported="html") == (
+    '<div adf="extension" '
+    'params=\'{"extensionKey":"toc","extensionType":"com.atlassian.confluence.macro.core"}\'></div>'
+)
 ```
 
 Known unsupported node handling:
-- `Document(...)` defaults to `on_known_unsupported="warn"` and emits `UserWarning` while skipping known unsupported nodes such as `extension`
-- `Document(..., on_known_unsupported="skip")` silently skips known unsupported nodes
-- `Document(..., on_known_unsupported="error")` raises `UnsupportedNodeTypeError`
+- `Document(...).to_markdown()` defaults to `on_known_unsupported="warn"` and emits `UserWarning` while skipping known unsupported nodes such as `extension`
+- `Document(...).to_markdown(on_known_unsupported="skip")` silently skips known unsupported nodes
+- `Document(...).to_markdown(on_known_unsupported="error")` raises `UnsupportedNodeTypeError`
+- `Document(...).to_markdown(on_known_unsupported="html")` preserves known unsupported nodes as invisible HTML fallback elements like `<div adf="extension" params='...'></div>` (or `<span ...></span>` in inline/cell contexts)
 
 The same `on_known_unsupported` option is available on `convert_jsonl(...)`.
 
@@ -166,6 +195,28 @@ doc.to_markdown(config)  # [Link text]
 |--------|--------|---------|-------------|
 | `bullet_marker` | `+`, `-`, `*` | `-` | Character used for bullet list items |
 | `show_links` | `True`, `False` | `True` | Show underlying links in markdown |
+
+## Supported Markdown Import Subset
+
+`Document.from_markdown(...)` and `markdown_to_adf(...)` currently support a
+small, strict subset of Markdown:
+
+- Paragraphs
+- ATX headings (`#` through `######`)
+- Bold / italic / bold+italic
+- Inline links
+- Bullet and ordered lists
+- Blockquotes
+- Fenced code blocks
+- GFM tables
+- pyadf HTML fallback elements such as `<div adf="extension" ...></div>`
+
+The importer intentionally rejects many other Markdown forms for now (for
+example generic HTML), so roundtrip behavior stays deterministic while the
+feature set is being expanded.
+
+For the living ADF element and Markdown import policy, see
+[`docs/jira-adf-element-policy.md`](docs/jira-adf-element-policy.md).
 
 ## Known Unsupported Nodes
 
@@ -256,6 +307,17 @@ ruff format --check src/ tests/ benchmarks/
 MIT License — see LICENSE file for details.
 
 ## Changelog
+
+### 0.5.0
+
+- Move `on_known_unsupported=error|skip|warn|html` from `Document(...)` construction to `Document(...).to_markdown(...)`
+- Add `on_known_unsupported="html"` to render known unsupported nodes as invisible HTML fallback elements
+- Add `Document.from_markdown(...)` for strict Markdown -> ADF parsing
+- Add `Document.to_adf()` for exporting canonical ADF dictionaries
+- Expand Markdown import support for inline code, strikethrough, task lists with `TODO` / `DONE` state, nested lists, multi-paragraph list items, and canonical GFM tables with inline marks
+- Preserve `taskList.attrs.localId` and `taskItem.attrs.localId/state` when exporting ADF; Markdown import sets task state but does not generate `localId`
+- Canonicalize accepted Markdown variants such as underscore emphasis, URL autolinks, and code-block info strings while rejecting reference-style links
+- Tighten pyadf HTML fallback parsing by rejecting unclosed fallback wrappers and malformed `params` JSON
 
 ### 0.4.3
 

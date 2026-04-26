@@ -2,9 +2,11 @@ use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList, PyNone, PyString};
 
 mod adf_node;
+mod adf_serialize;
 mod config;
 mod errors;
 mod markdown;
+mod markdown_parse;
 
 /// Convert a Python dict/list/scalar to serde_json::Value without going through JSON text.
 fn py_to_json_value(obj: &Bound<'_, PyAny>) -> PyResult<serde_json::Value> {
@@ -46,6 +48,39 @@ fn py_to_json_value(obj: &Bound<'_, PyAny>) -> PyResult<serde_json::Value> {
     }
 }
 
+fn json_value_to_py(py: Python<'_>, value: &serde_json::Value) -> PyResult<PyObject> {
+    match value {
+        serde_json::Value::Null => Ok(py.None()),
+        serde_json::Value::Bool(v) => Ok(PyBool::new(py, *v).to_owned().into_any().unbind()),
+        serde_json::Value::Number(v) => {
+            if let Some(i) = v.as_i64() {
+                Ok(i.into_pyobject(py)?.into_any().unbind())
+            } else if let Some(f) = v.as_f64() {
+                Ok(f.into_pyobject(py)?.into_any().unbind())
+            } else {
+                Err(pyo3::exceptions::PyValueError::new_err(
+                    "Unsupported JSON number",
+                ))
+            }
+        }
+        serde_json::Value::String(v) => Ok(v.into_pyobject(py)?.into_any().unbind()),
+        serde_json::Value::Array(values) => {
+            let list = PyList::empty(py);
+            for value in values {
+                list.append(json_value_to_py(py, value)?)?;
+            }
+            Ok(list.into_any().unbind())
+        }
+        serde_json::Value::Object(values) => {
+            let dict = PyDict::new(py);
+            for (key, value) in values {
+                dict.set_item(key, json_value_to_py(py, value)?)?;
+            }
+            Ok(dict.into_any().unbind())
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Opaque handle: parse once in __init__, render from cache in to_markdown()
 // ---------------------------------------------------------------------------
@@ -56,7 +91,6 @@ fn py_to_json_value(obj: &Bound<'_, PyAny>) -> PyResult<serde_json::Value> {
 #[pyclass(frozen)]
 struct ParsedAdf {
     node: adf_node::AdfNode,
-    skipped_nodes: Vec<adf_node::SkippedNode>,
 }
 
 type SkippedNodeInfo = (String, String);
@@ -67,63 +101,66 @@ fn parse_known_unsupported_mode(mode: &str) -> PyResult<adf_node::KnownUnsupport
         "error" => Ok(adf_node::KnownUnsupportedMode::Error),
         "skip" => Ok(adf_node::KnownUnsupportedMode::Skip),
         "warn" => Ok(adf_node::KnownUnsupportedMode::Warn),
+        "html" => Ok(adf_node::KnownUnsupportedMode::Html),
         _ => Err(pyo3::exceptions::PyValueError::new_err(format!(
-            "on_known_unsupported must be 'error', 'skip', or 'warn', got {mode:?}"
+            "on_known_unsupported must be 'error', 'skip', 'warn', or 'html', got {mode:?}"
         ))),
     }
 }
 
 /// Parse an ADF JSON string and return a cached handle.
 #[pyfunction]
-#[pyo3(signature = (json, on_known_unsupported="warn"))]
-fn parse_adf_str(py: Python<'_>, json: &str, on_known_unsupported: &str) -> PyResult<ParsedAdf> {
-    let mode = parse_known_unsupported_mode(on_known_unsupported)?;
-    let parsed = adf_node::parse_adf(json, mode).map_err(|e| errors::to_py_err(py, &e))?;
-    Ok(ParsedAdf {
-        node: parsed.node,
-        skipped_nodes: parsed.skipped_nodes,
-    })
+#[pyo3(signature = (json))]
+fn parse_adf_str(py: Python<'_>, json: &str) -> PyResult<ParsedAdf> {
+    let parsed = adf_node::parse_adf(json).map_err(|e| errors::to_py_err(py, &e))?;
+    Ok(ParsedAdf { node: parsed.node })
 }
 
 /// Parse a Python dict and return a cached handle (no JSON round-trip).
 #[pyfunction]
-#[pyo3(signature = (adf_dict, on_known_unsupported="warn"))]
-fn parse_adf_dict(
-    py: Python<'_>,
-    adf_dict: &Bound<'_, PyAny>,
-    on_known_unsupported: &str,
-) -> PyResult<ParsedAdf> {
+#[pyo3(signature = (adf_dict))]
+fn parse_adf_dict(py: Python<'_>, adf_dict: &Bound<'_, PyAny>) -> PyResult<ParsedAdf> {
     let value = py_to_json_value(adf_dict)?;
-    let mode = parse_known_unsupported_mode(on_known_unsupported)?;
-    let parsed =
-        adf_node::parse_adf_value(&value, "", mode).map_err(|e| errors::to_py_err(py, &e))?;
-    Ok(ParsedAdf {
-        node: parsed.node,
-        skipped_nodes: parsed.skipped_nodes,
-    })
+    let parsed = adf_node::parse_adf_value(&value, "").map_err(|e| errors::to_py_err(py, &e))?;
+    Ok(ParsedAdf { node: parsed.node })
 }
 
 #[pyfunction]
-fn skipped_known_unsupported(parsed: &ParsedAdf) -> Vec<(String, String)> {
-    parsed
-        .skipped_nodes
-        .iter()
-        .map(|node| (node.node_type.clone(), node.node_path.clone()))
-        .collect()
+fn parse_markdown_str(py: Python<'_>, markdown: &str) -> PyResult<ParsedAdf> {
+    let node = markdown_parse::parse_markdown(markdown).map_err(|e| errors::to_py_err(py, &e))?;
+    Ok(ParsedAdf { node })
+}
+
+#[pyfunction]
+fn parsed_adf_to_dict(py: Python<'_>, parsed: &ParsedAdf) -> PyResult<PyObject> {
+    let value = adf_serialize::to_value(&parsed.node);
+    json_value_to_py(py, &value)
 }
 
 /// Render a previously parsed ADF tree to markdown.
 #[pyfunction]
-#[pyo3(signature = (parsed, config=None))]
+#[pyo3(signature = (parsed, config=None, on_known_unsupported="warn"))]
 fn render_markdown(
+    py: Python<'_>,
     parsed: &ParsedAdf,
     config: Option<&config::PyMarkdownConfig>,
-) -> PyResult<String> {
+    on_known_unsupported: &str,
+) -> PyResult<(String, Vec<(String, String)>)> {
     let cfg = match config {
         Some(c) => c.to_internal(),
         None => config::MarkdownConfig::default(),
     };
-    Ok(markdown::render(&parsed.node, &cfg))
+    let mode = parse_known_unsupported_mode(on_known_unsupported)?;
+    let outcome =
+        markdown::render(&parsed.node, &cfg, mode).map_err(|e| errors::to_py_err(py, &e))?;
+    Ok((
+        outcome.markdown,
+        outcome
+            .warnings
+            .into_iter()
+            .map(|node| (node.node_type, node.node_path))
+            .collect(),
+    ))
 }
 
 // ---------------------------------------------------------------------------
@@ -144,8 +181,10 @@ fn document_to_markdown(
         None => config::MarkdownConfig::default(),
     };
     let mode = parse_known_unsupported_mode(on_known_unsupported)?;
-    let parsed = adf_node::parse_adf(json, mode).map_err(|e| errors::to_py_err(py, &e))?;
-    Ok(markdown::render(&parsed.node, &cfg))
+    let parsed = adf_node::parse_adf(json).map_err(|e| errors::to_py_err(py, &e))?;
+    let outcome =
+        markdown::render(&parsed.node, &cfg, mode).map_err(|e| errors::to_py_err(py, &e))?;
+    Ok(outcome.markdown)
 }
 
 // ---------------------------------------------------------------------------
@@ -186,16 +225,19 @@ fn convert_jsonl_batch(
                     Ok(s) => s,
                     Err(e) => return Some((None, Some(e.to_string()), Vec::new())),
                 };
-                match adf_node::parse_adf(json, mode) {
-                    Ok(parsed) => Some((
-                        Some(markdown::render(&parsed.node, &cfg)),
-                        None,
-                        parsed
-                            .skipped_nodes
-                            .into_iter()
-                            .map(|node| (node.node_type, node.node_path))
-                            .collect(),
-                    )),
+                match adf_node::parse_adf(json) {
+                    Ok(parsed) => match markdown::render(&parsed.node, &cfg, mode) {
+                        Ok(outcome) => Some((
+                            Some(outcome.markdown),
+                            None,
+                            outcome
+                                .warnings
+                                .into_iter()
+                                .map(|node| (node.node_type, node.node_path))
+                                .collect(),
+                        )),
+                        Err(e) => Some((None, Some(e.to_string()), Vec::new())),
+                    },
                     Err(e) => Some((None, Some(e.to_string()), Vec::new())),
                 }
             })
@@ -211,7 +253,8 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<config::PyMarkdownConfig>()?;
     m.add_function(wrap_pyfunction!(parse_adf_str, m)?)?;
     m.add_function(wrap_pyfunction!(parse_adf_dict, m)?)?;
-    m.add_function(wrap_pyfunction!(skipped_known_unsupported, m)?)?;
+    m.add_function(wrap_pyfunction!(parse_markdown_str, m)?)?;
+    m.add_function(wrap_pyfunction!(parsed_adf_to_dict, m)?)?;
     m.add_function(wrap_pyfunction!(render_markdown, m)?)?;
     m.add_function(wrap_pyfunction!(document_to_markdown, m)?)?;
     m.add_function(wrap_pyfunction!(convert_jsonl_batch, m)?)?;

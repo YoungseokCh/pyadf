@@ -1,5 +1,6 @@
-use crate::adf_node::{AdfNode, NodeKind};
+use crate::adf_node::{AdfNode, KnownUnsupportedMode, KnownUnsupportedNode, NodeKind};
 use crate::config::MarkdownConfig;
+use crate::errors::AdfError;
 
 /// Rendering context passed through the tree walk.
 struct RenderContext<'a> {
@@ -9,14 +10,26 @@ struct RenderContext<'a> {
     parent_kind: Option<ParentKind>,
 }
 
+struct RenderState {
+    known_unsupported_mode: KnownUnsupportedMode,
+    warnings: Vec<KnownUnsupportedNode>,
+}
+
+pub struct RenderOutcome {
+    pub markdown: String,
+    pub warnings: Vec<KnownUnsupportedNode>,
+}
+
 /// Lightweight tag for parent context (avoids cloning NodeKind).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ParentKind {
     Doc,
+    Paragraph,
     BulletList,
     OrderedList,
     TaskList,
     ListItem,
+    Heading,
     Panel,
     Blockquote,
     Table,
@@ -24,8 +37,12 @@ enum ParentKind {
     TableCell,
 }
 
-/// Render an ADF node tree to markdown.
-pub fn render(node: &AdfNode, config: &MarkdownConfig) -> String {
+/// Render an ADF node tree to markdown with known-unsupported handling.
+pub fn render(
+    node: &AdfNode,
+    config: &MarkdownConfig,
+    known_unsupported_mode: KnownUnsupportedMode,
+) -> Result<RenderOutcome, AdfError> {
     let mut out = String::new();
     let ctx = RenderContext {
         config,
@@ -33,43 +50,92 @@ pub fn render(node: &AdfNode, config: &MarkdownConfig) -> String {
         is_prev_hard_break: false,
         parent_kind: None,
     };
-    render_node(node, &ctx, &mut out);
-    out
+    let mut state = RenderState {
+        known_unsupported_mode,
+        warnings: Vec::new(),
+    };
+    render_node(node, &ctx, &mut out, &mut state)?;
+
+    Ok(RenderOutcome {
+        markdown: out,
+        warnings: state.warnings,
+    })
 }
 
-fn render_node(node: &AdfNode, ctx: &RenderContext, out: &mut String) {
+fn render_node(
+    node: &AdfNode,
+    ctx: &RenderContext,
+    out: &mut String,
+    state: &mut RenderState,
+) -> Result<(), AdfError> {
     match &node.kind {
-        NodeKind::Doc => render_doc(node, ctx, out),
-        NodeKind::Paragraph => render_paragraph(node, ctx, out),
-        NodeKind::Text { text, marks } => render_text(text, marks, ctx, out),
-        NodeKind::HardBreak => render_hard_break(out),
-        NodeKind::BulletList => render_bullet_list(node, ctx, out),
-        NodeKind::OrderedList => render_ordered_list(node, ctx, out),
-        NodeKind::TaskList => render_task_list(node, ctx, out),
-        NodeKind::ListItem | NodeKind::TaskItem => render_list_item(node, ctx, out),
-        NodeKind::Panel => render_panel(node, ctx, out),
-        NodeKind::Blockquote => render_blockquote(node, ctx, out),
-        NodeKind::Table => render_table(node, ctx, out),
-        NodeKind::TableRow => render_table_row(node, ctx, out),
+        NodeKind::Doc => render_doc(node, ctx, out, state),
+        NodeKind::Paragraph => render_paragraph(node, ctx, out, state),
+        NodeKind::Text { text, marks } => {
+            render_text(text, marks, ctx, out);
+            Ok(())
+        }
+        NodeKind::HardBreak => {
+            render_hard_break(out);
+            Ok(())
+        }
+        NodeKind::BulletList => render_bullet_list(node, ctx, out, state),
+        NodeKind::OrderedList => render_ordered_list(node, ctx, out, state),
+        NodeKind::TaskList { .. } => render_task_list(node, ctx, out, state),
+        NodeKind::ListItem | NodeKind::TaskItem { .. } => render_list_item(node, ctx, out, state),
+        NodeKind::Panel => render_panel(node, ctx, out, state),
+        NodeKind::Blockquote => render_blockquote(node, ctx, out, state),
+        NodeKind::Table => render_table(node, ctx, out, state),
+        NodeKind::TableRow => render_table_row(node, ctx, out, state),
         NodeKind::TableHeader { .. } | NodeKind::TableCell { .. } => {
-            render_table_cell(node, ctx, out)
+            render_table_cell(node, ctx, out, state)
         }
-        NodeKind::CodeBlock { language } => render_code_block(node, language.as_deref(), ctx, out),
+        NodeKind::CodeBlock { language } => {
+            render_code_block(node, language.as_deref(), ctx, out, state)
+        }
         NodeKind::InlineCard { url, data } => {
-            render_inline_card(url.as_deref(), data.as_deref(), out)
+            render_inline_card(url.as_deref(), data.as_deref(), out);
+            Ok(())
         }
-        NodeKind::Heading { level } => render_heading(node, *level, ctx, out),
-        NodeKind::Status { text } => render_status(text, out),
-        NodeKind::Emoji { short_name, text } => render_emoji(short_name, text.as_deref(), out),
-        NodeKind::Mention { text } => render_mention(text.as_deref(), out),
+        NodeKind::Heading { level } => render_heading(node, *level, ctx, out, state),
+        NodeKind::Status { text } => {
+            render_status(text, out);
+            Ok(())
+        }
+        NodeKind::Emoji { short_name, text } => {
+            render_emoji(short_name, text.as_deref(), out);
+            Ok(())
+        }
+        NodeKind::Mention { text } => {
+            render_mention(text.as_deref(), out);
+            Ok(())
+        }
         NodeKind::BlockCard { url, data } => {
-            render_block_card(url.as_deref(), data.as_deref(), out)
+            render_block_card(url.as_deref(), data.as_deref(), out);
+            Ok(())
         }
-        NodeKind::Unknown => render_children(node, ctx, out),
+        NodeKind::KnownUnsupported {
+            node_type,
+            node_path,
+            params,
+        } => render_known_unsupported(
+            node_type,
+            node_path,
+            params.as_deref(),
+            node,
+            ctx,
+            out,
+            state,
+        ),
     }
 }
 
-fn render_doc(node: &AdfNode, ctx: &RenderContext, out: &mut String) {
+fn render_doc(
+    node: &AdfNode,
+    ctx: &RenderContext,
+    out: &mut String,
+    state: &mut RenderState,
+) -> Result<(), AdfError> {
     let mut parts: Vec<String> = Vec::new();
     for child in &node.children {
         let mut child_out = String::new();
@@ -79,15 +145,21 @@ fn render_doc(node: &AdfNode, ctx: &RenderContext, out: &mut String) {
             is_prev_hard_break: false,
             parent_kind: Some(ParentKind::Doc),
         };
-        render_node(child, &child_ctx, &mut child_out);
+        render_node(child, &child_ctx, &mut child_out, state)?;
         if !child_out.is_empty() {
             parts.push(child_out);
         }
     }
     out.push_str(&parts.join("\n\n"));
+    Ok(())
 }
 
-fn render_paragraph(node: &AdfNode, ctx: &RenderContext, out: &mut String) {
+fn render_paragraph(
+    node: &AdfNode,
+    ctx: &RenderContext,
+    out: &mut String,
+    state: &mut RenderState,
+) -> Result<(), AdfError> {
     let skip_leading = ctx.parent_kind.is_none()
         || ctx.is_first
         || ctx.is_prev_hard_break
@@ -97,7 +169,7 @@ fn render_paragraph(node: &AdfNode, ctx: &RenderContext, out: &mut String) {
         out.push('\n');
     }
 
-    render_children(node, ctx, out);
+    render_children(node, ctx, out, state)
 }
 
 fn render_text(text: &str, marks: &[crate::adf_node::Mark], ctx: &RenderContext, out: &mut String) {
@@ -109,15 +181,23 @@ fn render_text(text: &str, marks: &[crate::adf_node::Mark], ctx: &RenderContext,
 
     let is_bold = marks.iter().any(|m| m.mark_type == "strong");
     let is_italic = marks.iter().any(|m| m.mark_type == "em");
+    let is_code = marks.iter().any(|m| m.mark_type == "code");
+    let is_strike = marks.iter().any(|m| m.mark_type == "strike");
     let link_mark = marks.iter().find(|m| m.mark_type == "link");
 
     let mut formatted = text.to_string();
 
-    if is_bold {
+    if is_code {
+        formatted = apply_inline_code(&formatted);
+    }
+    if is_bold && !is_code {
         formatted = apply_formatting(&formatted, "**");
     }
-    if is_italic {
+    if is_italic && !is_code {
         formatted = apply_formatting(&formatted, "*");
+    }
+    if is_strike && !is_code {
+        formatted = apply_formatting(&formatted, "~~");
     }
     if let Some(mark) = link_mark {
         formatted = format!("[{formatted}]");
@@ -137,58 +217,116 @@ fn render_hard_break(out: &mut String) {
     out.push_str("  \n");
 }
 
-fn render_bullet_list(node: &AdfNode, ctx: &RenderContext, out: &mut String) {
+fn render_bullet_list(
+    node: &AdfNode,
+    ctx: &RenderContext,
+    out: &mut String,
+    state: &mut RenderState,
+) -> Result<(), AdfError> {
     let marker = &ctx.config.bullet_marker;
     let mut items: Vec<String> = Vec::new();
     for child in &node.children {
         let mut item_out = String::new();
         let child_ctx = child_context(ctx, ParentKind::BulletList, false, false);
-        render_node(child, &child_ctx, &mut item_out);
+        render_node(child, &child_ctx, &mut item_out, state)?;
         items.push(format!("{marker} {item_out}"));
     }
     out.push_str(&items.join("\n"));
+    Ok(())
 }
 
-fn render_ordered_list(node: &AdfNode, ctx: &RenderContext, out: &mut String) {
+fn render_ordered_list(
+    node: &AdfNode,
+    ctx: &RenderContext,
+    out: &mut String,
+    state: &mut RenderState,
+) -> Result<(), AdfError> {
     let mut items: Vec<String> = Vec::new();
     for (idx, child) in node.children.iter().enumerate() {
         let mut item_out = String::new();
         let child_ctx = child_context(ctx, ParentKind::OrderedList, false, false);
-        render_node(child, &child_ctx, &mut item_out);
+        render_node(child, &child_ctx, &mut item_out, state)?;
         items.push(format!("{}. {item_out}", idx + 1));
     }
     out.push_str(&items.join("\n"));
+    Ok(())
 }
 
-fn render_task_list(node: &AdfNode, ctx: &RenderContext, out: &mut String) {
+fn render_task_list(
+    node: &AdfNode,
+    ctx: &RenderContext,
+    out: &mut String,
+    state: &mut RenderState,
+) -> Result<(), AdfError> {
     let mut items: Vec<String> = Vec::new();
     for child in &node.children {
         let mut item_out = String::new();
         let child_ctx = child_context(ctx, ParentKind::TaskList, false, false);
-        render_node(child, &child_ctx, &mut item_out);
-        items.push(format!("- [ ] {item_out}"));
+        render_node(child, &child_ctx, &mut item_out, state)?;
+        let marker = match &child.kind {
+            NodeKind::TaskItem { state, .. } if state.as_deref() == Some("DONE") => "[x]",
+            _ => "[ ]",
+        };
+        items.push(format!("- {marker} {item_out}"));
     }
     out.push_str(&items.join("\n"));
+    Ok(())
 }
 
-fn render_list_item(node: &AdfNode, ctx: &RenderContext, out: &mut String) {
-    render_children_with_parent(node, ctx, ParentKind::ListItem, out);
+fn render_list_item(
+    node: &AdfNode,
+    ctx: &RenderContext,
+    out: &mut String,
+    state: &mut RenderState,
+) -> Result<(), AdfError> {
+    for (idx, child) in node.children.iter().enumerate() {
+        let mut child_out = String::new();
+        let child_ctx = child_context(ctx, ParentKind::ListItem, idx == 0, false);
+        render_node(child, &child_ctx, &mut child_out, state)?;
+
+        if idx == 0 {
+            out.push_str(&child_out);
+        } else if is_list_node(child) {
+            out.push('\n');
+            indent_lines(&child_out, "  ", out);
+        } else {
+            out.push_str("\n\n");
+            indent_lines(&child_out, "  ", out);
+        }
+    }
+    Ok(())
 }
 
-fn render_panel(node: &AdfNode, ctx: &RenderContext, out: &mut String) {
-    let inner = render_children_as_blocks(node, ctx);
+fn render_panel(
+    node: &AdfNode,
+    ctx: &RenderContext,
+    out: &mut String,
+    state: &mut RenderState,
+) -> Result<(), AdfError> {
+    let inner = render_children_as_blocks(node, ctx, state)?;
     prefix_lines(&inner, "> ", out);
+    Ok(())
 }
 
-fn render_blockquote(node: &AdfNode, ctx: &RenderContext, out: &mut String) {
-    let inner = render_children_as_blocks(node, ctx);
+fn render_blockquote(
+    node: &AdfNode,
+    ctx: &RenderContext,
+    out: &mut String,
+    state: &mut RenderState,
+) -> Result<(), AdfError> {
+    let inner = render_children_as_blocks(node, ctx, state)?;
     let trimmed = inner.trim();
     prefix_lines(trimmed, "> ", out);
+    Ok(())
 }
 
 /// Render children as separate blocks joined by `\n\n` (like doc rendering).
 /// Used by panel/blockquote where each child paragraph needs a blank-line separator.
-fn render_children_as_blocks(node: &AdfNode, ctx: &RenderContext) -> String {
+fn render_children_as_blocks(
+    node: &AdfNode,
+    ctx: &RenderContext,
+    state: &mut RenderState,
+) -> Result<String, AdfError> {
     let mut parts: Vec<String> = Vec::new();
     for child in &node.children {
         let mut child_out = String::new();
@@ -198,12 +336,12 @@ fn render_children_as_blocks(node: &AdfNode, ctx: &RenderContext) -> String {
             is_prev_hard_break: false,
             parent_kind: parent_kind_of(&node.kind),
         };
-        render_node(child, &child_ctx, &mut child_out);
+        render_node(child, &child_ctx, &mut child_out, state)?;
         if !child_out.is_empty() {
             parts.push(child_out);
         }
     }
-    parts.join("\n\n")
+    Ok(parts.join("\n\n"))
 }
 
 /// Prefix every line with `prefix`. Empty lines between paragraphs get just the prefix (e.g. `>`).
@@ -223,12 +361,17 @@ fn prefix_lines(text: &str, prefix: &str, out: &mut String) {
     }
 }
 
-fn render_table(node: &AdfNode, ctx: &RenderContext, out: &mut String) {
+fn render_table(
+    node: &AdfNode,
+    ctx: &RenderContext,
+    out: &mut String,
+    state: &mut RenderState,
+) -> Result<(), AdfError> {
     let mut rows: Vec<String> = Vec::new();
     for child in &node.children {
         let mut row_out = String::new();
         let child_ctx = child_context(ctx, ParentKind::Table, false, false);
-        render_node(child, &child_ctx, &mut row_out);
+        render_node(child, &child_ctx, &mut row_out, state)?;
         rows.push(row_out);
 
         let is_header = child
@@ -242,6 +385,7 @@ fn render_table(node: &AdfNode, ctx: &RenderContext, out: &mut String) {
         }
     }
     out.push_str(&rows.join("\n"));
+    Ok(())
 }
 
 fn row_column_count(row_node: &AdfNode) -> usize {
@@ -257,19 +401,30 @@ fn row_column_count(row_node: &AdfNode) -> usize {
     count
 }
 
-fn render_table_row(node: &AdfNode, ctx: &RenderContext, out: &mut String) {
+fn render_table_row(
+    node: &AdfNode,
+    ctx: &RenderContext,
+    out: &mut String,
+    state: &mut RenderState,
+) -> Result<(), AdfError> {
     let mut cells: Vec<String> = Vec::new();
     for child in &node.children {
         let mut cell_out = String::new();
         let child_ctx = child_context(ctx, ParentKind::TableRow, false, false);
-        render_node(child, &child_ctx, &mut cell_out);
+        render_node(child, &child_ctx, &mut cell_out, state)?;
         cells.push(cell_out);
     }
     out.push_str(&format!("| {} |", cells.join(" | ")));
+    Ok(())
 }
 
-fn render_table_cell(node: &AdfNode, ctx: &RenderContext, out: &mut String) {
-    render_children(node, ctx, out);
+fn render_table_cell(
+    node: &AdfNode,
+    ctx: &RenderContext,
+    out: &mut String,
+    state: &mut RenderState,
+) -> Result<(), AdfError> {
+    render_children(node, ctx, out, state)
 }
 
 fn render_code_block(
@@ -277,16 +432,18 @@ fn render_code_block(
     language: Option<&str>,
     ctx: &RenderContext,
     out: &mut String,
-) {
+    state: &mut RenderState,
+) -> Result<(), AdfError> {
     let lang = language.unwrap_or("");
     let mut content = String::new();
-    render_children(node, ctx, &mut content);
+    render_children(node, ctx, &mut content, state)?;
 
     if lang.is_empty() {
         out.push_str(&format!("```\n{content}\n```"));
     } else {
         out.push_str(&format!("```{lang}\n{content}\n```"));
     }
+    Ok(())
 }
 
 fn render_inline_card(url: Option<&str>, data: Option<&str>, out: &mut String) {
@@ -299,13 +456,20 @@ fn render_inline_card(url: Option<&str>, data: Option<&str>, out: &mut String) {
     }
 }
 
-fn render_heading(node: &AdfNode, level: u8, ctx: &RenderContext, out: &mut String) {
+fn render_heading(
+    node: &AdfNode,
+    level: u8,
+    ctx: &RenderContext,
+    out: &mut String,
+    state: &mut RenderState,
+) -> Result<(), AdfError> {
     let prefix: String = "#".repeat(level as usize);
 
     let mut content = String::new();
-    render_children(node, ctx, &mut content);
+    render_children(node, ctx, &mut content, state)?;
 
     out.push_str(&format!("{prefix} {content}"));
+    Ok(())
 }
 
 fn render_status(text: &str, out: &mut String) {
@@ -334,13 +498,109 @@ fn render_block_card(url: Option<&str>, data: Option<&str>, out: &mut String) {
     }
 }
 
+fn render_known_unsupported(
+    node_type: &str,
+    node_path: &str,
+    params: Option<&str>,
+    node: &AdfNode,
+    ctx: &RenderContext,
+    out: &mut String,
+    state: &mut RenderState,
+) -> Result<(), AdfError> {
+    match state.known_unsupported_mode {
+        KnownUnsupportedMode::Error => {
+            return Err(AdfError::UnsupportedNodeType {
+                node_type: node_type.to_string(),
+                node_path: Some(node_path.to_string()),
+                supported_types: None,
+            });
+        }
+        KnownUnsupportedMode::Warn => {
+            state.warnings.push(KnownUnsupportedNode {
+                node_type: node_type.to_string(),
+                node_path: node_path.to_string(),
+            });
+            return render_children(node, ctx, out, state);
+        }
+        KnownUnsupportedMode::Skip => {
+            return render_children(node, ctx, out, state);
+        }
+        KnownUnsupportedMode::Html => {}
+    }
+
+    let tag = unsupported_tag(ctx);
+    let element = unsupported_element(tag, node_type, params);
+    out.push_str(&element);
+
+    if node.children.is_empty() {
+        return Ok(());
+    }
+
+    if tag == "div" {
+        let mut children_out = String::new();
+        render_children(node, ctx, &mut children_out, state)?;
+        if !children_out.is_empty() {
+            out.push_str("\n\n");
+            out.push_str(&children_out);
+        }
+        return Ok(());
+    }
+
+    render_children(node, ctx, out, state)
+}
+
+fn unsupported_tag(ctx: &RenderContext) -> &'static str {
+    match ctx.parent_kind {
+        Some(ParentKind::Paragraph | ParentKind::Heading | ParentKind::TableCell) => "span",
+        _ => "div",
+    }
+}
+
+fn unsupported_element(tag: &str, node_type: &str, params: Option<&str>) -> String {
+    let mut attrs = format!(" adf=\"{node_type}\"");
+    if let Some(params) = params {
+        attrs.push_str(" params='");
+        attrs.push_str(&escape_html_attr(params));
+        attrs.push('\'');
+    }
+    format!("<{tag}{attrs}></{tag}>")
+}
+
+fn escape_html_attr(text: &str) -> String {
+    text.replace('&', "&amp;").replace('\'', "&#39;")
+}
+
 // --- Helpers ---
 
 fn is_hard_break(node: &AdfNode) -> bool {
     matches!(node.kind, NodeKind::HardBreak)
 }
 
-fn render_children(node: &AdfNode, ctx: &RenderContext, out: &mut String) {
+fn is_list_node(node: &AdfNode) -> bool {
+    matches!(
+        node.kind,
+        NodeKind::BulletList | NodeKind::OrderedList | NodeKind::TaskList { .. }
+    )
+}
+
+fn indent_lines(text: &str, prefix: &str, out: &mut String) {
+    let mut first = true;
+    for line in text.split('\n') {
+        if !first {
+            out.push('\n');
+        }
+        first = false;
+        out.push_str(prefix);
+        out.push_str(line);
+    }
+}
+
+fn render_children(
+    node: &AdfNode,
+    ctx: &RenderContext,
+    out: &mut String,
+    state: &mut RenderState,
+) -> Result<(), AdfError> {
     for (idx, child) in node.children.iter().enumerate() {
         let prev_hard_break = if idx > 0 {
             is_hard_break(&node.children[idx - 1])
@@ -353,30 +613,9 @@ fn render_children(node: &AdfNode, ctx: &RenderContext, out: &mut String) {
             is_prev_hard_break: prev_hard_break,
             parent_kind: parent_kind_of(&node.kind),
         };
-        render_node(child, &child_ctx, out);
+        render_node(child, &child_ctx, out, state)?;
     }
-}
-
-fn render_children_with_parent(
-    node: &AdfNode,
-    ctx: &RenderContext,
-    parent: ParentKind,
-    out: &mut String,
-) {
-    for (idx, child) in node.children.iter().enumerate() {
-        let prev_hard_break = if idx > 0 {
-            is_hard_break(&node.children[idx - 1])
-        } else {
-            false
-        };
-        let child_ctx = RenderContext {
-            config: ctx.config,
-            is_first: idx == 0,
-            is_prev_hard_break: prev_hard_break,
-            parent_kind: Some(parent),
-        };
-        render_node(child, &child_ctx, out);
-    }
+    Ok(())
 }
 
 fn child_context<'a>(
@@ -396,10 +635,12 @@ fn child_context<'a>(
 fn parent_kind_of(kind: &NodeKind) -> Option<ParentKind> {
     match kind {
         NodeKind::Doc => Some(ParentKind::Doc),
+        NodeKind::Paragraph => Some(ParentKind::Paragraph),
         NodeKind::BulletList => Some(ParentKind::BulletList),
         NodeKind::OrderedList => Some(ParentKind::OrderedList),
-        NodeKind::TaskList => Some(ParentKind::TaskList),
-        NodeKind::ListItem | NodeKind::TaskItem => Some(ParentKind::ListItem),
+        NodeKind::TaskList { .. } => Some(ParentKind::TaskList),
+        NodeKind::ListItem | NodeKind::TaskItem { .. } => Some(ParentKind::ListItem),
+        NodeKind::Heading { .. } => Some(ParentKind::Heading),
         NodeKind::Panel => Some(ParentKind::Panel),
         NodeKind::Blockquote => Some(ParentKind::Blockquote),
         NodeKind::Table => Some(ParentKind::Table),
@@ -416,19 +657,31 @@ fn apply_formatting(text: &str, symbols: &str) -> String {
     format!("{symbols}{trimmed}{symbols}{spaces}")
 }
 
+fn apply_inline_code(text: &str) -> String {
+    format!("`{text}`")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::adf_node::{parse_adf, KnownUnsupportedMode};
 
     fn convert(json: &str) -> String {
-        let node = parse_adf(json, KnownUnsupportedMode::Skip).unwrap().node;
-        render(&node, &MarkdownConfig::default())
+        let node = parse_adf(json).unwrap().node;
+        render(
+            &node,
+            &MarkdownConfig::default(),
+            KnownUnsupportedMode::Skip,
+        )
+        .unwrap()
+        .markdown
     }
 
     fn convert_with(json: &str, config: &MarkdownConfig) -> String {
-        let node = parse_adf(json, KnownUnsupportedMode::Skip).unwrap().node;
-        render(&node, config)
+        let node = parse_adf(json).unwrap().node;
+        render(&node, config, KnownUnsupportedMode::Skip)
+            .unwrap()
+            .markdown
     }
 
     #[test]
@@ -447,6 +700,24 @@ mod tests {
     fn italic_text() {
         let json = r#"{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"italic","marks":[{"type":"em"}]}]}]}"#;
         assert_eq!(convert(json), "*italic*");
+    }
+
+    #[test]
+    fn inline_code_text() {
+        let json = r#"{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"code","marks":[{"type":"code"}]}]}]}"#;
+        assert_eq!(convert(json), "`code`");
+    }
+
+    #[test]
+    fn linked_inline_code_text() {
+        let json = r#"{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"code","marks":[{"type":"code"},{"type":"link","attrs":{"href":"http://e.com"}}]}]}]}"#;
+        assert_eq!(convert(json), "[`code`](http://e.com)");
+    }
+
+    #[test]
+    fn strikethrough_text() {
+        let json = r#"{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"strike","marks":[{"type":"strike"}]}]}]}"#;
+        assert_eq!(convert(json), "~~strike~~");
     }
 
     #[test]

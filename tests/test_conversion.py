@@ -354,14 +354,62 @@ class TestKnownUnsupportedNodes:
         }
 
         with pytest.warns(UserWarning, match='Known unsupported node type "extension"'):
-            assert Document(adf).to_markdown() == "Before\n\nAfter"
+            assert Document(adf).to_markdown(on_known_unsupported="warn") == "Before\n\nAfter"
 
     def test_extension_can_error(self):
         with pytest.raises(UnsupportedNodeTypeError):
-            Document({"type": "extension"}, on_known_unsupported="error")
+            Document({"type": "extension"}).to_markdown(on_known_unsupported="error")
 
     def test_extension_can_warn(self):
-        with pytest.warns(UserWarning, match='Known unsupported node type "extension"'):
-            doc = Document({"type": "extension"}, on_known_unsupported="warn")
+        doc = Document({"type": "extension"})
 
-        assert doc.to_markdown() == ""
+        with pytest.warns(UserWarning, match='Known unsupported node type "extension"'):
+            assert doc.to_markdown(on_known_unsupported="warn") == ""
+
+    def test_extension_can_render_as_html(self):
+        adf = {
+            "type": "extension",
+            "attrs": {
+                "extensionKey": "toc",
+                "extensionType": "com.atlassian.confluence.macro.core",
+            },
+        }
+
+        assert Document(adf).to_markdown(on_known_unsupported="html") == (
+            '<div adf="extension" '
+            'params=\'{"extensionKey":"toc","extensionType":"com.atlassian.confluence.macro.core"}\'></div>'
+        )
+
+    def test_extension_in_table_cell_renders_as_span(self):
+        adf = {
+            "type": "table",
+            "content": [
+                {
+                    "type": "tableRow",
+                    "content": [
+                        {
+                            "type": "tableCell",
+                            "content": [
+                                {
+                                    "type": "paragraph",
+                                    "content": [{"type": "text", "text": "Before "}],
+                                },
+                                {
+                                    "type": "extension",
+                                    "attrs": {
+                                        "extensionKey": "toc",
+                                        "extensionType": "com.atlassian.confluence.macro.core",
+                                    },
+                                },
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+
+        assert Document(adf).to_markdown(on_known_unsupported="html") == (
+            '| Before <span adf="extension" '
+            'params=\'{"extensionKey":"toc",'
+            '"extensionType":"com.atlassian.confluence.macro.core"}\'></span> |'
+        )

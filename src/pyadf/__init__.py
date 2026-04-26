@@ -1,4 +1,4 @@
-"""pyadf - A Python library for converting Atlassian Document Format (ADF) to Markdown."""
+"""pyadf - A Python library for converting Atlassian Document Format (ADF) and Markdown."""
 
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ from .exceptions import (
     InvalidFieldError,
     InvalidInputError,
     InvalidJSONError,
+    MarkdownParseError,
     MissingFieldError,
     NodeCreationError,
     PyADFError,
@@ -25,16 +26,18 @@ from .markdown import MarkdownConfig
 if TYPE_CHECKING:
     from typing import BinaryIO
 
-__version__ = "0.4.3"
+__version__ = "0.5.0"
 __all__ = [
     "Document",
     "MarkdownConfig",
     "ConversionError",
     "convert_jsonl",
+    "markdown_to_adf",
     "PyADFError",
     "InvalidADFError",
     "InvalidJSONError",
     "InvalidInputError",
+    "MarkdownParseError",
     "MissingFieldError",
     "InvalidFieldError",
     "UnsupportedNodeTypeError",
@@ -56,7 +59,7 @@ def convert_jsonl(
     *,
     config: MarkdownConfig | None = None,
     on_error: Literal["raise", "skip", "include"] = "include",
-    on_known_unsupported: Literal["error", "skip", "warn"] = "warn",
+    on_known_unsupported: Literal["error", "skip", "warn", "html"] = "warn",
     batch_size: int = 10_000,
 ) -> Iterator[str | ConversionError]:
     """Convert a JSONL source (one ADF document per line) to markdown strings.
@@ -69,7 +72,8 @@ def convert_jsonl(
             "skip"    - silently skip failed documents
             "include" - yield ConversionError objects for failed documents
         on_known_unsupported: How to handle known unsupported node types
-            such as "extension": "error", "skip", or "warn".
+            such as "extension" at render time:
+            "error", "skip", "warn", or "html".
         batch_size: Number of lines to process per Rust batch call.
 
     Yields:
@@ -80,9 +84,10 @@ def convert_jsonl(
         raise ValueError(f"batch_size must be >= 1, got {batch_size}")
     if on_error not in ("raise", "skip", "include"):
         raise ValueError(f"on_error must be 'raise', 'skip', or 'include', got {on_error!r}")
-    if on_known_unsupported not in ("error", "skip", "warn"):
+    if on_known_unsupported not in ("error", "skip", "warn", "html"):
         raise ValueError(
-            f"on_known_unsupported must be 'error', 'skip', or 'warn', got {on_known_unsupported!r}"
+            "on_known_unsupported must be 'error', 'skip', 'warn', or 'html', "
+            f"got {on_known_unsupported!r}"
         )
 
     rust_config = None
@@ -141,7 +146,7 @@ def convert_jsonl(
                     if on_error == "raise":
                         # Re-parse through Document to get the typed exception
                         # (InvalidJSONError, UnsupportedNodeTypeError, etc.)
-                        Document(raw_line, on_known_unsupported=on_known_unsupported)
+                        Document(raw_line).to_markdown(on_known_unsupported=on_known_unsupported)
                         # If Document didn't raise (shouldn't happen), fall back
                         raise PyADFError(error_msg)  # pragma: no cover
                     elif on_error == "skip":
@@ -155,3 +160,8 @@ def convert_jsonl(
     finally:
         if should_close:
             stream.close()
+
+
+def markdown_to_adf(markdown: str) -> dict:
+    """Convert Markdown text to canonical ADF dict."""
+    return Document.from_markdown(markdown).to_adf()

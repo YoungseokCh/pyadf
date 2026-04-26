@@ -312,6 +312,10 @@ impl ParseState {
     }
 
     fn finish(mut self) -> Result<AdfNode, AdfError> {
+        if self.pending_html.is_some() {
+            return Err(markdown_error("unclosed HTML fallback element"));
+        }
+
         if self.stack.len() != 1 {
             return Err(markdown_error("unclosed markdown blocks"));
         }
@@ -420,7 +424,7 @@ fn parse_known_unsupported_html(raw: &str) -> Option<AdfNode> {
     }
 
     let adf_type = extract_attr(raw, "adf", '"')?;
-    let params = extract_attr(raw, "params", '\'').map(html_unescape_attr);
+    let params = parse_params_attr(raw)?;
 
     Some(AdfNode {
         kind: NodeKind::KnownUnsupported {
@@ -443,7 +447,7 @@ fn parse_known_unsupported_html_open(raw: &str) -> Option<PendingHtml> {
     };
 
     let node_type = extract_attr(raw, "adf", '"')?;
-    let params = extract_attr(raw, "params", '\'').map(html_unescape_attr);
+    let params = parse_params_attr(raw)?;
 
     Some(PendingHtml {
         tag: tag.to_string(),
@@ -462,6 +466,25 @@ fn extract_attr(raw: &str, name: &str, quote: char) -> Option<String> {
 
 fn html_unescape_attr(value: String) -> String {
     value.replace("&amp;", "&").replace("&#39;", "'")
+}
+
+fn parse_params_attr(raw: &str) -> Option<Option<String>> {
+    let Some(params) = extract_attr(raw, "params", '\'').map(html_unescape_attr) else {
+        return Some(None);
+    };
+
+    if is_valid_json_object(&params) {
+        Some(Some(params))
+    } else {
+        None
+    }
+}
+
+fn is_valid_json_object(raw: &str) -> bool {
+    serde_json::from_str::<serde_json::Value>(raw)
+        .ok()
+        .and_then(|value| value.as_object().cloned())
+        .is_some()
 }
 
 fn html_close_tag(raw: &str, tag: &str) -> bool {

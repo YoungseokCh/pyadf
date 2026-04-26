@@ -23,7 +23,6 @@ class TestMarkdownReject:
         with pytest.raises(MarkdownParseError):
             Document.from_markdown("[x][ref]\n\n[ref]: http://example.com")
 
-    @pytest.mark.xfail(strict=True, reason="strict reject policy not enforced yet")
     @pytest.mark.parametrize(
         "markdown",
         [
@@ -31,6 +30,6 @@ class TestMarkdownReject:
             '<div adf="extension" params=\'{"bad":}\'></div>',
         ],
     )
-    def test_known_reject_gaps(self, markdown):
+    def test_rejects_malformed_html_fallback(self, markdown):
         with pytest.raises(MarkdownParseError):
             Document.from_markdown(markdown)

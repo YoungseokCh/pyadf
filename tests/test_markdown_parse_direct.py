@@ -333,7 +333,6 @@ class TestDirectParseKnownGaps:
             ],
         }
 
-    @pytest.mark.xfail(strict=True, reason="table header parsing not implemented yet")
     def test_table_with_inline_marks(self):
         assert Document.from_markdown(
             "| **A** | [B](http://e.com) |\n| --- | --- |\n| C | D |"

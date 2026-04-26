@@ -26,6 +26,7 @@ struct ParseState {
     marks: Vec<Mark>,
     link_href: Option<String>,
     pending_html: Option<PendingHtml>,
+    in_table_head: bool,
 }
 
 impl ParseState {
@@ -35,6 +36,7 @@ impl ParseState {
             marks: Vec::new(),
             link_href: None,
             pending_html: None,
+            in_table_head: false,
         }
     }
 
@@ -168,10 +170,13 @@ impl ParseState {
                 Ok(())
             }
             Tag::Table(_) => self.push_frame(NodeKind::Table),
-            Tag::TableHead => Ok(()),
+            Tag::TableHead => {
+                self.in_table_head = true;
+                self.push_frame(NodeKind::TableRow)
+            }
             Tag::TableRow => self.push_frame(NodeKind::TableRow),
             Tag::TableCell => {
-                let kind = if self.current_table_row_is_header() {
+                let kind = if self.in_table_head {
                     NodeKind::TableHeader { colspan: 1 }
                 } else {
                     NodeKind::TableCell { colspan: 1 }
@@ -194,7 +199,10 @@ impl ParseState {
             | TagEnd::TableRow
             | TagEnd::TableCell => self.pop_frame(),
             TagEnd::HtmlBlock => Ok(()),
-            TagEnd::TableHead => Ok(()),
+            TagEnd::TableHead => {
+                self.in_table_head = false;
+                self.pop_frame()
+            }
             TagEnd::Emphasis | TagEnd::Strong | TagEnd::Strikethrough => {
                 self.marks.pop();
                 Ok(())
@@ -300,20 +308,6 @@ impl ParseState {
             .last()
             .map(|frame| matches!(frame.kind, NodeKind::CodeBlock { .. }))
             .unwrap_or(false)
-    }
-
-    fn current_table_row_is_header(&self) -> bool {
-        self.stack
-            .iter()
-            .rev()
-            .any(|frame| matches!(frame.kind, NodeKind::TableRow))
-            && self
-                .stack
-                .iter()
-                .rev()
-                .find(|frame| matches!(frame.kind, NodeKind::Table))
-                .map(|table| table.children.is_empty())
-                .unwrap_or(false)
     }
 
     fn mark_current_item_as_task(&mut self, checked: bool) -> Result<(), AdfError> {

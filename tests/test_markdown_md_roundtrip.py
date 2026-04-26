@@ -71,7 +71,6 @@ class TestMarkdownRoundtripKnownGaps:
         markdown = "- A\n\n  B"
         assert Document.from_markdown(markdown).to_markdown() == markdown
 
-    @pytest.mark.xfail(strict=True, reason="table header roundtrip not implemented yet")
     def test_table_with_inline_marks_roundtrip(self):
         markdown = "| **A** | [B](http://e.com) |\n| --- | --- |\n| C | D |"
         assert Document.from_markdown(markdown).to_markdown() == markdown

@@ -24,7 +24,6 @@ class TestMarkdownReject:
         "markdown",
         [
             "[x][ref]\n\n[ref]: http://example.com",
-            "<http://example.com>",
             "`code`",
             "~~x~~",
             "- [ ] task",

@@ -11,6 +11,9 @@ class TestMarkdownRoundtripExact:
         [
             "Hello",
             "# Title",
+            "*x*",
+            "**x**",
+            "[http://e.com](http://e.com)",
             "## **Title**",
             "Hello, **world!**",
             "A  \nB",

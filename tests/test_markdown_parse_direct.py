@@ -65,6 +65,25 @@ class TestDirectParsePass:
             ],
         }
 
+    def test_autolink_maps_to_link_mark(self):
+        assert Document.from_markdown("<http://e.com>").to_adf() == {
+            "type": "doc",
+            "content": [
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "http://e.com",
+                            "marks": [
+                                {"type": "link", "attrs": {"href": "http://e.com"}}
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+
     def test_code_block_with_blank_lines(self):
         assert Document.from_markdown("```\na\n\nb\n```").to_adf() == {
             "type": "doc",

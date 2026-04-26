@@ -79,6 +79,9 @@ adf2 = markdown_to_adf("1. First\n2. Second")
 The Markdown importer is currently strict and targets the canonical subset that
 pyadf already renders well.
 
+Detailed ADF element and Markdown import policy lives in
+[`docs/jira-adf-element-policy.md`](docs/jira-adf-element-policy.md).
+
 ### Converting Individual Nodes
 
 ```python
@@ -212,6 +215,9 @@ The importer intentionally rejects many other Markdown forms for now (for
 example generic HTML), so roundtrip behavior stays deterministic while the
 feature set is being expanded.
 
+For the living ADF element and Markdown import policy, see
+[`docs/jira-adf-element-policy.md`](docs/jira-adf-element-policy.md).
+
 ## Known Unsupported Nodes
 
 These node types are recognized but not rendered. By default they are skipped:
@@ -308,7 +314,10 @@ MIT License — see LICENSE file for details.
 - Add `on_known_unsupported="html"` to render known unsupported nodes as invisible HTML fallback elements
 - Add `Document.from_markdown(...)` for strict Markdown -> ADF parsing
 - Add `Document.to_adf()` for exporting canonical ADF dictionaries
-- Add initial Markdown/ADF roundtrip tests
+- Expand Markdown import support for inline code, strikethrough, task lists with `TODO` / `DONE` state, nested lists, multi-paragraph list items, and canonical GFM tables with inline marks
+- Preserve `taskList.attrs.localId` and `taskItem.attrs.localId/state` when exporting ADF; Markdown import sets task state but does not generate `localId`
+- Canonicalize accepted Markdown variants such as underscore emphasis, URL autolinks, and code-block info strings while rejecting reference-style links
+- Tighten pyadf HTML fallback parsing by rejecting unclosed fallback wrappers and malformed `params` JSON
 
 ### 0.4.3
 

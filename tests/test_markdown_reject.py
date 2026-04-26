@@ -19,11 +19,14 @@ class TestMarkdownReject:
         with pytest.raises(MarkdownParseError):
             Document.from_markdown(markdown)
 
+    def test_rejects_reference_style_link(self):
+        with pytest.raises(MarkdownParseError):
+            Document.from_markdown("[x][ref]\n\n[ref]: http://example.com")
+
     @pytest.mark.xfail(strict=True, reason="strict reject policy not enforced yet")
     @pytest.mark.parametrize(
         "markdown",
         [
-            "[x][ref]\n\n[ref]: http://example.com",
             "`code`",
             "~~x~~",
             "- [ ] task",

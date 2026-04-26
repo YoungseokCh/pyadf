@@ -1,6 +1,6 @@
 use crate::adf_node::{AdfNode, Mark, NodeKind};
 use crate::errors::AdfError;
-use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, TagEnd};
+use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, LinkType, Options, Parser, Tag, TagEnd};
 
 pub fn parse_markdown(markdown: &str) -> Result<AdfNode, AdfError> {
     let parser = Parser::new_ext(markdown, markdown_options());
@@ -150,7 +150,12 @@ impl ParseState {
                 });
                 Ok(())
             }
-            Tag::Link { dest_url, .. } => {
+            Tag::Link {
+                link_type,
+                dest_url,
+                ..
+            } => {
+                reject_unsupported_link_type(link_type)?;
                 self.link_href = Some(dest_url.to_string());
                 Ok(())
             }
@@ -315,6 +320,20 @@ fn code_block_language(kind: CodeBlockKind<'_>) -> Option<String> {
     match kind {
         CodeBlockKind::Indented => None,
         CodeBlockKind::Fenced(info) => info.split_whitespace().next().map(str::to_string),
+    }
+}
+
+fn reject_unsupported_link_type(link_type: LinkType) -> Result<(), AdfError> {
+    match link_type {
+        LinkType::Reference
+        | LinkType::ReferenceUnknown
+        | LinkType::Collapsed
+        | LinkType::CollapsedUnknown
+        | LinkType::Shortcut
+        | LinkType::ShortcutUnknown => {
+            Err(markdown_error("reference-style links are not supported yet"))
+        }
+        _ => Ok(()),
     }
 }
 

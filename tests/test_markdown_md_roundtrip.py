@@ -47,7 +47,6 @@ class TestMarkdownRoundtripCanonicalized:
             ("__x__", "**x**"),
             ("***[x](http://e.com)***", "[***x***](http://e.com)"),
             ("<http://e.com>", "[http://e.com](http://e.com)"),
-            ("[x][ref]\n\n[ref]: http://e.com", "[x](http://e.com)"),
             ("```python linenos\nprint(1)\n```", "```python\nprint(1)\n```"),
         ],
     )

@@ -218,13 +218,42 @@ impl ParseState {
             .pop()
             .ok_or_else(|| markdown_error("invalid parser stack state"))?;
         let node = frame.into_node();
-        self.push_child(node);
+        self.push_node_or_split_mixed_paragraph(node);
         Ok(())
     }
 
     fn push_child(&mut self, node: AdfNode) {
         if let Some(frame) = self.stack.last_mut() {
             frame.children.push(node);
+        }
+    }
+
+    fn push_node_or_split_mixed_paragraph(&mut self, node: AdfNode) {
+        if !matches!(node.kind, NodeKind::Paragraph) || !node.children.iter().any(is_block_node) {
+            self.push_child(node);
+            return;
+        }
+
+        let mut inline_children = Vec::new();
+        for child in node.children {
+            if is_block_node(&child) {
+                if !inline_children.is_empty() {
+                    self.push_child(AdfNode {
+                        kind: NodeKind::Paragraph,
+                        children: std::mem::take(&mut inline_children),
+                    });
+                }
+                self.push_child(child);
+            } else {
+                inline_children.push(child);
+            }
+        }
+
+        if !inline_children.is_empty() {
+            self.push_child(AdfNode {
+                kind: NodeKind::Paragraph,
+                children: inline_children,
+            });
         }
     }
 
@@ -352,22 +381,40 @@ impl Frame {
     fn into_node(self) -> AdfNode {
         let Frame { kind, children } = self;
         let children = match kind {
-            NodeKind::ListItem if children.first().is_some_and(|child| !is_block_node(child)) => {
-                vec![AdfNode {
-                    kind: NodeKind::Paragraph,
-                    children,
-                }]
-            }
-            NodeKind::TaskItem { .. } if children.first().is_some_and(is_block_node) => children,
-            NodeKind::TaskItem { .. } => vec![AdfNode {
-                kind: NodeKind::Paragraph,
-                children,
-            }],
+            NodeKind::ListItem | NodeKind::TaskItem { .. } => normalize_block_children(children),
             _ => children,
         };
 
         AdfNode { kind, children }
     }
+}
+
+fn normalize_block_children(children: Vec<AdfNode>) -> Vec<AdfNode> {
+    let mut normalized = Vec::new();
+    let mut inline_children = Vec::new();
+
+    for child in children {
+        if is_block_node(&child) {
+            if !inline_children.is_empty() {
+                normalized.push(AdfNode {
+                    kind: NodeKind::Paragraph,
+                    children: std::mem::take(&mut inline_children),
+                });
+            }
+            normalized.push(child);
+        } else {
+            inline_children.push(child);
+        }
+    }
+
+    if !inline_children.is_empty() {
+        normalized.push(AdfNode {
+            kind: NodeKind::Paragraph,
+            children: inline_children,
+        });
+    }
+
+    normalized
 }
 
 fn heading_level(level: HeadingLevel) -> u8 {

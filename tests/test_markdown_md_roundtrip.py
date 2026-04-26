@@ -63,12 +63,10 @@ class TestMarkdownRoundtripCanonicalized:
 
 
 class TestMarkdownRoundtripKnownGaps:
-    @pytest.mark.xfail(strict=True, reason="nested list rendering not canonical yet")
     def test_nested_list_roundtrip(self):
         markdown = "- A\n  - B"
         assert Document.from_markdown(markdown).to_markdown() == markdown
 
-    @pytest.mark.xfail(strict=True, reason="multi-paragraph list item rendering not canonical yet")
     def test_multi_paragraph_list_item_roundtrip(self):
         markdown = "- A\n\n  B"
         assert Document.from_markdown(markdown).to_markdown() == markdown

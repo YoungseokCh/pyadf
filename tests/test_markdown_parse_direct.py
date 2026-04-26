@@ -273,7 +273,6 @@ class TestDirectParsePass:
 
 
 class TestDirectParseKnownGaps:
-    @pytest.mark.xfail(strict=True, reason="nested list structure not canonical yet")
     def test_nested_bullet_list(self):
         assert Document.from_markdown("- A\n  - B").to_adf() == {
             "type": "doc",

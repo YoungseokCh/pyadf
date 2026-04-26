@@ -279,7 +279,22 @@ fn render_list_item(
     out: &mut String,
     state: &mut RenderState,
 ) -> Result<(), AdfError> {
-    render_children_with_parent(node, ctx, ParentKind::ListItem, out, state)
+    for (idx, child) in node.children.iter().enumerate() {
+        let mut child_out = String::new();
+        let child_ctx = child_context(ctx, ParentKind::ListItem, idx == 0, false);
+        render_node(child, &child_ctx, &mut child_out, state)?;
+
+        if idx == 0 {
+            out.push_str(&child_out);
+        } else if is_list_node(child) {
+            out.push('\n');
+            indent_lines(&child_out, "  ", out);
+        } else {
+            out.push_str("\n\n");
+            indent_lines(&child_out, "  ", out);
+        }
+    }
+    Ok(())
 }
 
 fn render_panel(
@@ -561,6 +576,25 @@ fn is_hard_break(node: &AdfNode) -> bool {
     matches!(node.kind, NodeKind::HardBreak)
 }
 
+fn is_list_node(node: &AdfNode) -> bool {
+    matches!(
+        node.kind,
+        NodeKind::BulletList | NodeKind::OrderedList | NodeKind::TaskList { .. }
+    )
+}
+
+fn indent_lines(text: &str, prefix: &str, out: &mut String) {
+    let mut first = true;
+    for line in text.split('\n') {
+        if !first {
+            out.push('\n');
+        }
+        first = false;
+        out.push_str(prefix);
+        out.push_str(line);
+    }
+}
+
 fn render_children(
     node: &AdfNode,
     ctx: &RenderContext,
@@ -578,30 +612,6 @@ fn render_children(
             is_first: idx == 0,
             is_prev_hard_break: prev_hard_break,
             parent_kind: parent_kind_of(&node.kind),
-        };
-        render_node(child, &child_ctx, out, state)?;
-    }
-    Ok(())
-}
-
-fn render_children_with_parent(
-    node: &AdfNode,
-    ctx: &RenderContext,
-    parent: ParentKind,
-    out: &mut String,
-    state: &mut RenderState,
-) -> Result<(), AdfError> {
-    for (idx, child) in node.children.iter().enumerate() {
-        let prev_hard_break = if idx > 0 {
-            is_hard_break(&node.children[idx - 1])
-        } else {
-            false
-        };
-        let child_ctx = RenderContext {
-            config: ctx.config,
-            is_first: idx == 0,
-            is_prev_hard_break: prev_hard_break,
-            parent_kind: Some(parent),
         };
         render_node(child, &child_ctx, out, state)?;
     }

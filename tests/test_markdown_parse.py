@@ -8,6 +8,7 @@ from pyadf import Document, MarkdownParseError, markdown_to_adf
 class TestToAdf:
     def test_existing_document_can_serialize_to_adf(self):
         adf = {
+            "version": 1,
             "type": "doc",
             "content": [
                 {"type": "paragraph", "content": [{"type": "text", "text": "Hello"}]},
@@ -20,6 +21,7 @@ class TestToAdf:
 class TestFromMarkdown:
     def test_simple_paragraph(self):
         assert Document.from_markdown("Hello").to_adf() == {
+            "version": 1,
             "type": "doc",
             "content": [
                 {"type": "paragraph", "content": [{"type": "text", "text": "Hello"}]},
@@ -28,6 +30,7 @@ class TestFromMarkdown:
 
     def test_heading(self):
         assert Document.from_markdown("# Title").to_adf() == {
+            "version": 1,
             "type": "doc",
             "content": [
                 {
@@ -40,6 +43,7 @@ class TestFromMarkdown:
 
     def test_strong_and_emphasis(self):
         assert Document.from_markdown("***Hi***").to_adf() == {
+            "version": 1,
             "type": "doc",
             "content": [
                 {
@@ -57,6 +61,7 @@ class TestFromMarkdown:
 
     def test_link(self):
         assert Document.from_markdown("[x](http://example.com)").to_adf() == {
+            "version": 1,
             "type": "doc",
             "content": [
                 {
@@ -74,6 +79,7 @@ class TestFromMarkdown:
 
     def test_bullet_list(self):
         assert Document.from_markdown("- A\n- B").to_adf() == {
+            "version": 1,
             "type": "doc",
             "content": [
                 {
@@ -104,6 +110,7 @@ class TestFromMarkdown:
 
     def test_ordered_list(self):
         assert Document.from_markdown("1. A\n2. B").to_adf() == {
+            "version": 1,
             "type": "doc",
             "content": [
                 {
@@ -134,6 +141,7 @@ class TestFromMarkdown:
 
     def test_hard_break(self):
         assert Document.from_markdown("A  \nB").to_adf() == {
+            "version": 1,
             "type": "doc",
             "content": [
                 {
@@ -149,6 +157,7 @@ class TestFromMarkdown:
 
     def test_blockquote_two_paragraphs(self):
         assert Document.from_markdown("> A\n>\n> B").to_adf() == {
+            "version": 1,
             "type": "doc",
             "content": [
                 {
@@ -169,6 +178,7 @@ class TestFromMarkdown:
 
     def test_table(self):
         assert Document.from_markdown("| A | B |\n| --- | --- |\n| C | D |").to_adf() == {
+            "version": 1,
             "type": "doc",
             "content": [
                 {
@@ -219,6 +229,7 @@ class TestFromMarkdown:
         )
 
         assert Document.from_markdown(markdown).to_adf() == {
+            "version": 1,
             "type": "doc",
             "content": [
                 {
@@ -238,6 +249,7 @@ class TestFromMarkdown:
         )
 
         assert Document.from_markdown(markdown).to_adf() == {
+            "version": 1,
             "type": "doc",
             "content": [
                 {

@@ -11,6 +11,7 @@ class TestAdfRoundtripExact:
         [
             (
                 {
+                    "version": 1,
                     "type": "doc",
                     "content": [
                         {"type": "paragraph", "content": [{"type": "text", "text": "Hello"}]},
@@ -20,6 +21,7 @@ class TestAdfRoundtripExact:
             ),
             (
                 {
+                    "version": 1,
                     "type": "doc",
                     "content": [
                         {
@@ -33,6 +35,7 @@ class TestAdfRoundtripExact:
             ),
             (
                 {
+                    "version": 1,
                     "type": "doc",
                     "content": [
                         {
@@ -52,6 +55,7 @@ class TestAdfRoundtripExact:
             ),
             (
                 {
+                    "version": 1,
                     "type": "doc",
                     "content": [
                         {
@@ -68,6 +72,7 @@ class TestAdfRoundtripExact:
             ),
             (
                 {
+                    "version": 1,
                     "type": "doc",
                     "content": [
                         {
@@ -99,6 +104,7 @@ class TestAdfRoundtripExact:
             ),
             (
                 {
+                    "version": 1,
                     "type": "doc",
                     "content": [
                         {
@@ -130,6 +136,7 @@ class TestAdfRoundtripExact:
             ),
             (
                 {
+                    "version": 1,
                     "type": "doc",
                     "content": [
                         {
@@ -145,6 +152,7 @@ class TestAdfRoundtripExact:
             ),
             (
                 {
+                    "version": 1,
                     "type": "doc",
                     "content": [
                         {
@@ -158,6 +166,7 @@ class TestAdfRoundtripExact:
             ),
             (
                 {
+                    "version": 1,
                     "type": "doc",
                     "content": [
                         {
@@ -179,6 +188,7 @@ class TestAdfRoundtripExact:
 class TestTaskAdfAttrs:
     def test_task_attrs_are_preserved_in_to_adf(self):
         adf = {
+            "version": 1,
             "type": "doc",
             "content": [
                 {
@@ -204,6 +214,7 @@ class TestTaskAdfAttrs:
 
     def test_task_item_state_controls_markdown_checkbox(self):
         adf = {
+            "version": 1,
             "type": "doc",
             "content": [
                 {
@@ -230,6 +241,7 @@ class TestTaskAdfAttrs:
 class TestAdfRoundtripMarkdownStable:
     def test_panel_roundtrips_markdown_as_blockquote(self):
         adf = {
+            "version": 1,
             "type": "doc",
             "content": [
                 {

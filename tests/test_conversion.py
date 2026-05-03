@@ -8,6 +8,7 @@ from pyadf import Document, MarkdownConfig, UnsupportedNodeTypeError
 class TestParagraph:
     def test_simple_paragraph(self):
         adf = {
+            "version": 1,
             "type": "doc",
             "content": [
                 {"type": "paragraph", "content": [{"type": "text", "text": "Hello, world!"}]},
@@ -17,6 +18,7 @@ class TestParagraph:
 
     def test_full_document_two_paragraphs(self):
         adf = {
+            "version": 1,
             "type": "doc",
             "content": [
                 {"type": "paragraph", "content": [{"type": "text", "text": "First paragraph"}]},
@@ -320,6 +322,7 @@ class TestBlockCard:
 
     def test_in_document(self):
         adf = {
+            "version": 1,
             "type": "doc",
             "content": [
                 {"type": "paragraph"},
@@ -339,6 +342,7 @@ class TestBlockCard:
 class TestKnownUnsupportedNodes:
     def test_extension_warns_by_default(self):
         adf = {
+            "version": 1,
             "type": "doc",
             "content": [
                 {"type": "paragraph", "content": [{"type": "text", "text": "Before"}]},

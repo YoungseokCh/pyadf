@@ -8,6 +8,7 @@ class TestMarkdownCompliance:
         markdown = "> Info"
 
         assert Document.from_markdown(markdown).to_adf() == {
+            "version": 1,
             "type": "doc",
             "content": [
                 {
@@ -24,6 +25,7 @@ class TestMarkdownCompliance:
 
     def test_html_fallback_uses_div_at_root_context(self):
         adf = {
+            "version": 1,
             "type": "doc",
             "content": [{"type": "extension", "attrs": {"extensionKey": "toc"}}],
         }
@@ -34,6 +36,7 @@ class TestMarkdownCompliance:
 
     def test_html_fallback_uses_span_in_paragraph_context(self):
         adf = {
+            "version": 1,
             "type": "doc",
             "content": [
                 {
@@ -52,6 +55,7 @@ class TestMarkdownCompliance:
 
     def test_html_fallback_uses_span_in_table_cell_context(self):
         adf = {
+            "version": 1,
             "type": "doc",
             "content": [
                 {

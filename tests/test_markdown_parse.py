@@ -6,6 +6,9 @@ from pyadf import Document, MarkdownParseError, markdown_to_adf
 
 
 class TestToAdf:
+    def test_empty_document_serializes_to_versioned_doc(self):
+        assert Document().to_adf() == {"version": 1, "type": "doc", "content": []}
+
     def test_existing_document_can_serialize_to_adf(self):
         adf = {
             "version": 1,

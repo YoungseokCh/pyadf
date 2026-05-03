@@ -30,7 +30,9 @@ pub struct Mark {
 /// Node-specific data for each ADF node type.
 #[derive(Debug, Clone)]
 pub enum NodeKind {
-    Doc,
+    Doc {
+        version: u8,
+    },
     Paragraph,
     Text {
         text: String,
@@ -308,7 +310,9 @@ fn build_node_kind(
     }
 
     match type_str {
-        "doc" => Ok(NodeKind::Doc),
+        "doc" => Ok(NodeKind::Doc {
+            version: parse_doc_version(obj, current_path)?,
+        }),
         "paragraph" => Ok(NodeKind::Paragraph),
         "text" => {
             let text = obj
@@ -381,6 +385,29 @@ fn build_node_kind(
             node_type: type_str.to_string(),
             node_path: Some(current_path.to_string()),
             supported_types: Some(supported_type_strings()),
+        }),
+    }
+}
+
+fn parse_doc_version(
+    obj: &serde_json::Map<String, Value>,
+    node_path: &str,
+) -> Result<u8, AdfError> {
+    let version_val = obj.get("version").ok_or_else(|| AdfError::MissingField {
+        field_name: "version".to_string(),
+        node_type: Some("doc".to_string()),
+        node_path: Some(node_path_or_root(node_path)),
+        expected_values: Some(vec!["1".to_string()]),
+    })?;
+
+    match version_val.as_i64() {
+        Some(1) => Ok(1),
+        _ => Err(AdfError::InvalidField {
+            field_name: "version".to_string(),
+            invalid_value: format!("{version_val:?}"),
+            node_type: Some("doc".to_string()),
+            node_path: Some(node_path_or_root(node_path)),
+            expected_values: Some(vec!["1".to_string()]),
         }),
     }
 }
@@ -473,9 +500,9 @@ mod tests {
 
     #[test]
     fn parse_simple_paragraph() {
-        let json = r#"{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Hello"}]}]}"#;
+        let json = r#"{"version":1,"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Hello"}]}]}"#;
         let node = parse_adf(json).unwrap().node;
-        assert!(matches!(node.kind, NodeKind::Doc));
+        assert!(matches!(node.kind, NodeKind::Doc { version: 1 }));
         assert_eq!(node.children.len(), 1);
         assert!(matches!(node.children[0].kind, NodeKind::Paragraph));
         match &node.children[0].children[0].kind {
@@ -518,7 +545,7 @@ mod tests {
 
     #[test]
     fn parse_known_unsupported_preserves_node() {
-        let json = r#"{"type":"doc","content":[{"type":"mediaSingle"}]}"#;
+        let json = r#"{"version":1,"type":"doc","content":[{"type":"mediaSingle"}]}"#;
         let node = parse_adf(json).unwrap().node;
         assert_eq!(node.children.len(), 1);
         assert!(matches!(
@@ -529,7 +556,7 @@ mod tests {
 
     #[test]
     fn parse_extension_as_known_unsupported() {
-        let json = r#"{"type":"doc","content":[{"type":"extension"}]}"#;
+        let json = r#"{"version":1,"type":"doc","content":[{"type":"extension"}]}"#;
         let node = parse_adf(json).unwrap().node;
         assert_eq!(node.children.len(), 1);
         assert!(matches!(
@@ -612,7 +639,7 @@ mod tests {
 
     #[test]
     fn parse_invalid_attrs() {
-        let result = parse_adf(r#"{"type":"doc","attrs":"bad"}"#);
+        let result = parse_adf(r#"{"version":1,"type":"doc","attrs":"bad"}"#);
         assert!(result.is_err());
         match result.unwrap_err() {
             AdfError::InvalidField { field_name, .. } => assert_eq!(field_name, "attrs"),
@@ -622,7 +649,7 @@ mod tests {
 
     #[test]
     fn parse_invalid_content() {
-        let result = parse_adf(r#"{"type":"doc","content":"bad"}"#);
+        let result = parse_adf(r#"{"version":1,"type":"doc","content":"bad"}"#);
         assert!(result.is_err());
         match result.unwrap_err() {
             AdfError::InvalidField { field_name, .. } => assert_eq!(field_name, "content"),

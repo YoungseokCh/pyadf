@@ -32,7 +32,7 @@ struct ParseState {
 impl ParseState {
     fn new() -> Self {
         Self {
-            stack: vec![Frame::new(NodeKind::Doc)],
+            stack: vec![Frame::new(NodeKind::Doc { version: 1 })],
             marks: Vec::new(),
             link_href: None,
             pending_html: None,

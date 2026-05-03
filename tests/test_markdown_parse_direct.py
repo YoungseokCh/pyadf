@@ -6,6 +6,7 @@ from pyadf import Document
 class TestDirectParsePass:
     def test_underscore_emphasis_maps_to_em_mark(self):
         assert Document.from_markdown("_x_").to_adf() == {
+            "version": 1,
             "type": "doc",
             "content": [
                 {
@@ -17,6 +18,7 @@ class TestDirectParsePass:
 
     def test_underscore_strong_maps_to_strong_mark(self):
         assert Document.from_markdown("__x__").to_adf() == {
+            "version": 1,
             "type": "doc",
             "content": [
                 {
@@ -28,6 +30,7 @@ class TestDirectParsePass:
 
     def test_heading_with_strong_mark(self):
         assert Document.from_markdown("## **Title**").to_adf() == {
+            "version": 1,
             "type": "doc",
             "content": [
                 {
@@ -40,6 +43,7 @@ class TestDirectParsePass:
 
     def test_combined_strong_em_link_order(self):
         assert Document.from_markdown("***[x](http://e.com)***").to_adf() == {
+            "version": 1,
             "type": "doc",
             "content": [
                 {
@@ -61,6 +65,7 @@ class TestDirectParsePass:
 
     def test_autolink_maps_to_link_mark(self):
         assert Document.from_markdown("<http://e.com>").to_adf() == {
+            "version": 1,
             "type": "doc",
             "content": [
                 {
@@ -78,6 +83,7 @@ class TestDirectParsePass:
 
     def test_inline_code_maps_to_code_mark(self):
         assert Document.from_markdown("`code`").to_adf() == {
+            "version": 1,
             "type": "doc",
             "content": [
                 {
@@ -95,6 +101,7 @@ class TestDirectParsePass:
 
     def test_linked_inline_code_uses_code_and_link_marks(self):
         assert Document.from_markdown("[`code`](http://e.com)").to_adf() == {
+            "version": 1,
             "type": "doc",
             "content": [
                 {
@@ -115,6 +122,7 @@ class TestDirectParsePass:
 
     def test_strikethrough_maps_to_strike_mark(self):
         assert Document.from_markdown("~~x~~").to_adf() == {
+            "version": 1,
             "type": "doc",
             "content": [
                 {
@@ -132,6 +140,7 @@ class TestDirectParsePass:
 
     def test_unchecked_task_list_maps_to_todo_task_item(self):
         assert Document.from_markdown("- [ ] task").to_adf() == {
+            "version": 1,
             "type": "doc",
             "content": [
                 {
@@ -154,6 +163,7 @@ class TestDirectParsePass:
 
     def test_checked_task_list_maps_to_done_task_item(self):
         assert Document.from_markdown("- [x] task").to_adf() == {
+            "version": 1,
             "type": "doc",
             "content": [
                 {
@@ -176,6 +186,7 @@ class TestDirectParsePass:
 
     def test_code_block_with_blank_lines(self):
         assert Document.from_markdown("```\na\n\nb\n```").to_adf() == {
+            "version": 1,
             "type": "doc",
             "content": [
                 {
@@ -187,6 +198,7 @@ class TestDirectParsePass:
 
     def test_code_block_uses_first_info_token_as_language(self):
         assert Document.from_markdown("```python linenos\nprint(1)\n```").to_adf() == {
+            "version": 1,
             "type": "doc",
             "content": [
                 {
@@ -199,6 +211,7 @@ class TestDirectParsePass:
 
     def test_blockquote_with_list(self):
         assert Document.from_markdown("> - A\n> - B").to_adf() == {
+            "version": 1,
             "type": "doc",
             "content": [
                 {
@@ -234,6 +247,7 @@ class TestDirectParsePass:
 
     def test_blockquote_with_code_block(self):
         assert Document.from_markdown("> ```\n> x\n> ```").to_adf() == {
+            "version": 1,
             "type": "doc",
             "content": [
                 {
@@ -253,6 +267,7 @@ class TestDirectParsePass:
             '<div adf="extension" params=\'{"text":"Tom &amp; Jerry","value":"it&#39;s"}\'></div>'
         )
         assert Document.from_markdown(markdown).to_adf() == {
+            "version": 1,
             "type": "doc",
             "content": [
                 {
@@ -266,6 +281,7 @@ class TestDirectParsePass:
 class TestDirectParseKnownGaps:
     def test_nested_bullet_list(self):
         assert Document.from_markdown("- A\n  - B").to_adf() == {
+            "version": 1,
             "type": "doc",
             "content": [
                 {
@@ -301,6 +317,7 @@ class TestDirectParseKnownGaps:
 
     def test_multi_paragraph_list_item(self):
         assert Document.from_markdown("- A\n\n  B").to_adf() == {
+            "version": 1,
             "type": "doc",
             "content": [
                 {
@@ -328,6 +345,7 @@ class TestDirectParseKnownGaps:
         assert Document.from_markdown(
             "| **A** | [B](http://e.com) |\n| --- | --- |\n| C | D |"
         ).to_adf() == {
+            "version": 1,
             "type": "doc",
             "content": [
                 {

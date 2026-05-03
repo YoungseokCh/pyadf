@@ -129,7 +129,7 @@ class Document:
 
     def to_adf(self) -> dict:
         if self._parsed is None:
-            return {"type": "doc", "content": []}
+            return {"version": 1, "type": "doc", "content": []}
 
         adf = _core.parsed_adf_to_dict(self._parsed)
         if not isinstance(adf, dict):  # pragma: no cover

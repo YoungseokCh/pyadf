@@ -5,8 +5,8 @@ pub fn to_value(node: &AdfNode) -> Value {
     let mut obj = Map::new();
 
     match &node.kind {
-        NodeKind::Doc => {
-            obj.insert("version".to_string(), json!(1));
+        NodeKind::Doc { version } => {
+            obj.insert("version".to_string(), json!(version));
             obj.insert("type".to_string(), json!("doc"));
             insert_children(&mut obj, &node.children);
         }

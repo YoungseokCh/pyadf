@@ -69,7 +69,7 @@ fn render_node(
     state: &mut RenderState,
 ) -> Result<(), AdfError> {
     match &node.kind {
-        NodeKind::Doc => render_doc(node, ctx, out, state),
+        NodeKind::Doc { .. } => render_doc(node, ctx, out, state),
         NodeKind::Paragraph => render_paragraph(node, ctx, out, state),
         NodeKind::Text { text, marks } => {
             render_text(text, marks, ctx, out);
@@ -634,7 +634,7 @@ fn child_context<'a>(
 
 fn parent_kind_of(kind: &NodeKind) -> Option<ParentKind> {
     match kind {
-        NodeKind::Doc => Some(ParentKind::Doc),
+        NodeKind::Doc { .. } => Some(ParentKind::Doc),
         NodeKind::Paragraph => Some(ParentKind::Paragraph),
         NodeKind::BulletList => Some(ParentKind::BulletList),
         NodeKind::OrderedList => Some(ParentKind::OrderedList),
@@ -686,55 +686,55 @@ mod tests {
 
     #[test]
     fn simple_paragraph() {
-        let json = r#"{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Hello, world!"}]}]}"#;
+        let json = r#"{"version":1,"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Hello, world!"}]}]}"#;
         assert_eq!(convert(json), "Hello, world!");
     }
 
     #[test]
     fn bold_text() {
-        let json = r#"{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"bold","marks":[{"type":"strong"}]}]}]}"#;
+        let json = r#"{"version":1,"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"bold","marks":[{"type":"strong"}]}]}]}"#;
         assert_eq!(convert(json), "**bold**");
     }
 
     #[test]
     fn italic_text() {
-        let json = r#"{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"italic","marks":[{"type":"em"}]}]}]}"#;
+        let json = r#"{"version":1,"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"italic","marks":[{"type":"em"}]}]}]}"#;
         assert_eq!(convert(json), "*italic*");
     }
 
     #[test]
     fn inline_code_text() {
-        let json = r#"{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"code","marks":[{"type":"code"}]}]}]}"#;
+        let json = r#"{"version":1,"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"code","marks":[{"type":"code"}]}]}]}"#;
         assert_eq!(convert(json), "`code`");
     }
 
     #[test]
     fn linked_inline_code_text() {
-        let json = r#"{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"code","marks":[{"type":"code"},{"type":"link","attrs":{"href":"http://e.com"}}]}]}]}"#;
+        let json = r#"{"version":1,"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"code","marks":[{"type":"code"},{"type":"link","attrs":{"href":"http://e.com"}}]}]}]}"#;
         assert_eq!(convert(json), "[`code`](http://e.com)");
     }
 
     #[test]
     fn strikethrough_text() {
-        let json = r#"{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"strike","marks":[{"type":"strike"}]}]}]}"#;
+        let json = r#"{"version":1,"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"strike","marks":[{"type":"strike"}]}]}]}"#;
         assert_eq!(convert(json), "~~strike~~");
     }
 
     #[test]
     fn bold_italic_text() {
-        let json = r#"{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"both","marks":[{"type":"strong"},{"type":"em"}]}]}]}"#;
+        let json = r#"{"version":1,"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"both","marks":[{"type":"strong"},{"type":"em"}]}]}]}"#;
         assert_eq!(convert(json), "***both***");
     }
 
     #[test]
     fn link_text_show_by_default() {
-        let json = r#"{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"click","marks":[{"type":"link","attrs":{"href":"http://example.com/"}}]}]}]}"#;
+        let json = r#"{"version":1,"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"click","marks":[{"type":"link","attrs":{"href":"http://example.com/"}}]}]}]}"#;
         assert_eq!(convert(json), "[click](http://example.com/)");
     }
 
     #[test]
     fn link_text_hide_when_disabled() {
-        let json = r#"{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"click","marks":[{"type":"link","attrs":{"href":"http://example.com/"}}]}]}]}"#;
+        let json = r#"{"version":1,"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"click","marks":[{"type":"link","attrs":{"href":"http://example.com/"}}]}]}]}"#;
         let config = MarkdownConfig::new("-", false).unwrap();
         assert_eq!(convert_with(json, &config), "[click]");
     }
@@ -865,7 +865,7 @@ mod tests {
 
     #[test]
     fn full_document() {
-        let json = r#"{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"First"}]},{"type":"paragraph","content":[{"type":"text","text":"Second"}]}]}"#;
+        let json = r#"{"version":1,"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"First"}]},{"type":"paragraph","content":[{"type":"text","text":"Second"}]}]}"#;
         assert_eq!(convert(json), "First\n\nSecond");
     }
 

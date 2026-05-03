@@ -64,6 +64,7 @@ class TestMissingFieldErrors:
         with pytest.raises(MissingFieldError) as exc_info:
             Document(
                 {
+                    "version": 1,
                     "type": "doc",
                     "content": [
                         {
@@ -76,6 +77,13 @@ class TestMissingFieldErrors:
         error = exc_info.value
         assert 'Missing required field "type"' in str(error)
         assert "paragraph" in str(error).lower()
+
+    def test_missing_version_in_doc_node(self):
+        with pytest.raises(MissingFieldError) as exc_info:
+            Document({"type": "doc", "content": []})
+        error = exc_info.value
+        assert 'Missing required field "version"' in str(error)
+        assert "at: doc" in str(error)
 
 
 class TestUnsupportedNodeTypes:
@@ -91,6 +99,7 @@ class TestUnsupportedNodeTypes:
         with pytest.raises(UnsupportedNodeTypeError) as exc_info:
             Document(
                 {
+                    "version": 1,
                     "type": "doc",
                     "content": [
                         {
@@ -112,21 +121,35 @@ class TestUnsupportedNodeTypes:
 
     def test_invalid_known_unsupported_mode(self):
         with pytest.raises(ValueError, match="on_known_unsupported"):
-            Document({"type": "doc"}).to_markdown(on_known_unsupported="invalid")  # type: ignore[arg-type]
+            Document({"version": 1, "type": "doc"}).to_markdown(on_known_unsupported="invalid")  # type: ignore[arg-type]
 
 
 class TestInvalidFieldErrors:
     def test_invalid_content_field(self):
         """content must be a list of dicts, not a string."""
         with pytest.raises(InvalidFieldError) as exc_info:
-            Document({"type": "doc", "content": "bad"})
+            Document({"version": 1, "type": "doc", "content": "bad"})
         assert "content" in str(exc_info.value)
 
     def test_invalid_attrs_field(self):
         """attrs must be a dict, not a string."""
         with pytest.raises(InvalidFieldError) as exc_info:
-            Document({"type": "doc", "attrs": "bad"})
+            Document({"version": 1, "type": "doc", "attrs": "bad"})
         assert "attrs" in str(exc_info.value)
+
+    def test_invalid_doc_version_value(self):
+        with pytest.raises(InvalidFieldError) as exc_info:
+            Document({"version": 2, "type": "doc", "content": []})
+        error = exc_info.value
+        assert "version" in str(error)
+        assert "1" in str(error)
+
+    def test_invalid_doc_version_type(self):
+        with pytest.raises(InvalidFieldError) as exc_info:
+            Document({"version": "1", "type": "doc", "content": []})
+        error = exc_info.value
+        assert "version" in str(error)
+        assert "1" in str(error)
 
     def test_invalid_marks_field(self):
         """marks must be a list of dicts."""
@@ -140,6 +163,7 @@ class TestErrorMessageQuality:
         with pytest.raises(UnsupportedNodeTypeError) as exc_info:
             Document(
                 {
+                    "version": 1,
                     "type": "doc",
                     "content": [
                         {
@@ -170,6 +194,7 @@ class TestValidData:
     def test_valid_document(self):
         doc = Document(
             {
+                "version": 1,
                 "type": "doc",
                 "content": [
                     {"type": "paragraph", "content": [{"type": "text", "text": "Hello, world!"}]},
@@ -177,3 +202,7 @@ class TestValidData:
             }
         )
         assert doc.to_markdown() == "Hello, world!"
+
+    def test_non_doc_root_is_still_allowed(self):
+        doc = Document({"type": "paragraph", "content": [{"type": "text", "text": "Hi"}]})
+        assert doc.to_markdown() == "Hi"

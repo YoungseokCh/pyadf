@@ -6,6 +6,7 @@ import json
 def make_adf_doc(text: str) -> dict:
     """Create a minimal ADF doc with a single paragraph."""
     return {
+        "version": 1,
         "type": "doc",
         "content": [
             {"type": "paragraph", "content": [{"type": "text", "text": text}]},

@@ -6,10 +6,9 @@ A high-performance Python library for converting [Atlassian Document Format (ADF
 
 ## Features
 
-- **Rust-powered** — parsing and rendering run in native code via PyO3
-- **Streaming JSONL API** for ETL pipelines processing millions of documents
-- **Same `Document` class API** — drop-in upgrade for most users (see changelog for breaking changes)
-- **Flexible input** — accepts JSON strings, dictionaries, or any ADF node type
+- Rust-powered — parsing and rendering run in native code via PyO3
+- **Robust error handling** with detailed, context-aware error messages
+- **Type-safe** with comprehensive type hints and Python 3.11+ support
 - **Comprehensive node support**:
   - Text formatting (bold, italic, links)
   - Headings (h1-h6)
@@ -18,9 +17,7 @@ A high-performance Python library for converting [Atlassian Document Format (ADF
   - Code blocks with syntax highlighting
   - Blockquotes and panels
   - Status badges, inline cards, block cards, emoji, mentions
-- **Type-safe** with comprehensive type hints and Python 3.11+ support
-- **Eager validation** — ADF structure errors surface at construction time, not render time
-- **Robust error handling** with detailed, context-aware error messages
+- **Streaming JSONL API** for ETL pipelines processing millions of documents
 
 ## Installation
 
@@ -30,6 +27,8 @@ pip install pyadf
 
 Prebuilt wheels are available for Linux and macOS (x86_64 and aarch64) and Windows (x86_64).
 
+pyadf only supports Python version from 3.11.
+
 ## Usage
 
 ### Basic Usage
@@ -38,6 +37,7 @@ Prebuilt wheels are available for Linux and macOS (x86_64 and aarch64) and Windo
 from pyadf import Document
 
 adf_data = {
+    "version": 1,
     "type": "doc",
     "content": [
         {
@@ -80,7 +80,7 @@ The Markdown importer is currently strict and targets the canonical subset that
 pyadf already renders well.
 
 Detailed ADF element and Markdown import policy lives in
-[`docs/jira-adf-element-policy.md`](docs/jira-adf-element-policy.md).
+[`docs/adf-element-policy.md`](docs/adf-element-policy.md).
 
 ### Converting Individual Nodes
 
@@ -216,11 +216,11 @@ example generic HTML), so roundtrip behavior stays deterministic while the
 feature set is being expanded.
 
 For the living ADF element and Markdown import policy, see
-[`docs/jira-adf-element-policy.md`](docs/jira-adf-element-policy.md).
+[`docs/adf-element-policy.md`](docs/adf-element-policy.md).
 
 ## Known Unsupported Nodes
 
-These node types are recognized but not rendered. By default they are skipped:
+These node types are recognized but not rendered. By default they are warned:
 
 - `mediaSingle`
 - `mediaGroup`
@@ -307,6 +307,11 @@ ruff format --check src/ tests/ benchmarks/
 MIT License — see LICENSE file for details.
 
 ## Changelog
+
+### 0.5.1
+
+- Support 'version' property for top-level ADF Document node
+- Add Python 3.14 support
 
 ### 0.5.0
 

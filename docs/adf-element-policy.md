@@ -89,8 +89,6 @@ Status meanings:
 - pyadf's current mark model preserves mark type and link href. Marks that require richer attrs, such as `border`, `textColor`, `backgroundColor`, and `subsup`, need a mark-attrs model before they can be native-rendered or imported safely.
 - Some structure-index entries currently have no stable detail page under the documented URL pattern, so they are listed without footnotes until an official detail page is available.
 
-## References
-
 [^node-blockquote]: Jira blockquote node: <https://developer.atlassian.com/cloud/jira/platform/apis/document/nodes/blockquote/>
 [^node-bulletlist]: Jira bulletList node: <https://developer.atlassian.com/cloud/jira/platform/apis/document/nodes/bulletList/>
 [^node-codeblock]: Jira codeBlock node: <https://developer.atlassian.com/cloud/jira/platform/apis/document/nodes/codeBlock/>

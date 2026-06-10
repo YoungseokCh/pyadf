@@ -2,7 +2,13 @@
 
 import pytest
 
-from pyadf import Document, MarkdownConfig, UnsupportedNodeTypeError
+from pyadf import (
+    Document,
+    InvalidFieldError,
+    MarkdownConfig,
+    MissingFieldError,
+    UnsupportedNodeTypeError,
+)
 
 
 class TestParagraph:
@@ -417,3 +423,58 @@ class TestKnownUnsupportedNodes:
             'params=\'{"extensionKey":"toc",'
             '"extensionType":"com.atlassian.confluence.macro.core"}\'></span> |'
         )
+
+
+class TestDate:
+    # 1582152559000 ms == 2020-02-19T22:49:19Z
+    def _date_doc(self, timestamp: str | int = "1582152559000") -> dict:
+        return {
+            "version": 1,
+            "type": "doc",
+            "content": [
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {"type": "text", "text": "Due: "},
+                        {"type": "date", "attrs": {"timestamp": timestamp}},
+                    ],
+                }
+            ],
+        }
+
+    def test_default_iso_utc(self):
+        assert Document(self._date_doc()).to_markdown() == "Due: 2020-02-19T22:49:19+00:00"
+
+    def test_integer_timestamp_raises(self):
+        with pytest.raises(InvalidFieldError) as exc_info:
+            Document(self._date_doc(1582152559000))
+        assert "timestamp" in str(exc_info.value)
+
+    def test_custom_format_date_only(self):
+        config = MarkdownConfig(date_format="%Y-%m-%d")
+        assert Document(self._date_doc()).to_markdown(config) == "Due: 2020-02-19"
+
+    def test_named_timezone_shifts_day(self):
+        # 22:49Z is the next calendar day in Seoul (+09:00).
+        config = MarkdownConfig(date_timezone="Asia/Seoul", date_format="%Y-%m-%d")
+        assert Document(self._date_doc()).to_markdown(config) == "Due: 2020-02-20"
+
+    def test_named_timezone_is_dst_aware(self):
+        config = MarkdownConfig(date_timezone="America/New_York", date_format="%Y-%m-%d %H:%M %Z")
+        assert Document(self._date_doc()).to_markdown(config) == "Due: 2020-02-19 17:49 EST"
+
+    def test_missing_timestamp_raises(self):
+        adf = {"type": "date", "attrs": {}}
+        with pytest.raises(MissingFieldError) as exc_info:
+            Document(adf)
+        assert "timestamp" in str(exc_info.value)
+
+    def test_non_numeric_timestamp_raises(self):
+        adf = {"type": "date", "attrs": {"timestamp": "not-a-number"}}
+        with pytest.raises(InvalidFieldError) as exc_info:
+            Document(adf)
+        assert "timestamp" in str(exc_info.value)
+
+    def test_roundtrip_serializes_timestamp_as_string(self):
+        adf = {"type": "date", "attrs": {"timestamp": "1582152559000"}}
+        assert Document(adf).to_adf() == adf

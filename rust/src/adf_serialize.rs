@@ -87,6 +87,13 @@ pub fn to_value(node: &AdfNode) -> Value {
                 obj.insert("attrs".to_string(), json!({ "text": text }));
             }
         }
+        NodeKind::Date { timestamp } => {
+            obj.insert("type".to_string(), json!("date"));
+            obj.insert(
+                "attrs".to_string(),
+                json!({ "timestamp": timestamp.to_string() }),
+            );
+        }
         NodeKind::BlockCard { url, data } => {
             obj.insert("type".to_string(), json!("blockCard"));
             insert_attrs(&mut obj, card_attrs(url, data));

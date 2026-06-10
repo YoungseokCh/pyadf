@@ -56,7 +56,7 @@ Status meanings:
 | `status`[^node-status] | native | reject | Markdown-like output is ambiguous with plain formatted text. |
 | `emoji`[^node-emoji] | native | reject | Markdown import treats emoji text as plain text. |
 | `mention`[^node-mention] | native | reject | Markdown import treats mention text as plain text. |
-| `date`[^node-date] | defer | defer | Jira element not yet represented in pyadf's native node enum. |
+| `date`[^node-date] | native | reject | Renders the epoch-millisecond `timestamp` via `MarkdownConfig.date_timezone`/`date_format`; Markdown import treats the formatted date as plain text. |
 | `nestedExpand`[^node-nestedexpand] | defer | defer | Jira element not yet represented in pyadf's native node enum. |
 | `extensionFrame` | defer | defer | Listed in the structure index, but not yet represented in pyadf's native node enum. |
 | `expand`[^node-expand] | html-fallback | reject | Known unsupported node; fallback HTML only. |

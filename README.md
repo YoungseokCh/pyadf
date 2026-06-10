@@ -17,6 +17,7 @@ A high-performance Python library for converting [Atlassian Document Format (ADF
   - Code blocks with syntax highlighting
   - Blockquotes and panels
   - Status badges, inline cards, block cards, emoji, mentions
+  - Dates with configurable timezone and format
 - **Streaming JSONL API** for ETL pipelines processing millions of documents
 
 ## Installation
@@ -195,6 +196,8 @@ doc.to_markdown(config)  # [Link text]
 |--------|--------|---------|-------------|
 | `bullet_marker` | `+`, `-`, `*` | `-` | Character used for bullet list items |
 | `show_links` | `True`, `False` | `True` | Show underlying links in markdown |
+| `date_timezone` | IANA timezone name | `UTC` | Timezone used to render `date` nodes (e.g. `America/New_York`) |
+| `date_format` | [strftime](https://docs.rs/chrono/latest/chrono/format/strftime/index.html) pattern | `%Y-%m-%dT%H:%M:%S%:z` | Format used to render `date` nodes |
 
 ## Supported Markdown Import Subset
 
@@ -252,6 +255,7 @@ These node types are recognized but not rendered. By default they are warned:
 | `hardBreak` | Line break | |
 | `mention` | `@DisplayName` | Jira user mentions |
 | `blockCard` | `[link]` or code block | Link previews |
+| `date` | `2020-02-19T22:49:19+00:00` | Configurable via `date_timezone` / `date_format` |
 
 ## Exception Types
 
@@ -307,6 +311,10 @@ ruff format --check src/ tests/ benchmarks/
 MIT License — see LICENSE file for details.
 
 ## Changelog
+
+### Unreleased
+
+- Add `date` node support, rendered via the new `MarkdownConfig.date_timezone` (IANA timezone, default `UTC`) and `date_format` (strftime, default ISO 8601 date-time) options
 
 ### 0.5.1
 

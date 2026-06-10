@@ -79,6 +79,10 @@ pub enum NodeKind {
     Mention {
         text: Option<String>,
     },
+    Date {
+        /// Unix epoch timestamp in milliseconds.
+        timestamp: i64,
+    },
     BlockCard {
         url: Option<String>,
         data: Option<String>,
@@ -121,6 +125,7 @@ const SUPPORTED_TYPES: &[&str] = &[
     "emoji",
     "mention",
     "blockCard",
+    "date",
 ];
 
 /// Convert to Vec<String> only when needed (error messages).
@@ -376,6 +381,10 @@ fn build_node_kind(
             let text = attr_opt_string(attrs, "text");
             Ok(NodeKind::Mention { text })
         }
+        "date" => {
+            let timestamp = parse_date_timestamp(attrs, current_path)?;
+            Ok(NodeKind::Date { timestamp })
+        }
         "blockCard" => {
             let url = attr_opt_string(attrs, "url");
             let data = attr_opt_string(attrs, "data");
@@ -410,6 +419,38 @@ fn parse_doc_version(
             expected_values: Some(vec!["1".to_string()]),
         }),
     }
+}
+
+/// Parse the `date` node's `timestamp` attr into Unix epoch milliseconds.
+///
+/// The ADF spec defines `timestamp` as a string holding the epoch milliseconds,
+/// so only a string is accepted. A missing value, a non-string value, or a
+/// string that does not parse as an integer is a hard input error.
+fn parse_date_timestamp(
+    attrs: &serde_json::Map<String, Value>,
+    node_path: &str,
+) -> Result<i64, AdfError> {
+    let value = attrs
+        .get("timestamp")
+        .ok_or_else(|| AdfError::MissingField {
+            field_name: "timestamp".to_string(),
+            node_type: Some("date".to_string()),
+            node_path: Some(node_path_or_root(node_path)),
+            expected_values: None,
+        })?;
+
+    let parsed = match value {
+        Value::String(s) => s.parse::<i64>().ok(),
+        _ => None,
+    };
+
+    parsed.ok_or_else(|| AdfError::InvalidField {
+        field_name: "timestamp".to_string(),
+        invalid_value: format!("{value}"),
+        node_type: Some("date".to_string()),
+        node_path: Some(node_path_or_root(node_path)),
+        expected_values: None,
+    })
 }
 
 fn attr_string(attrs: &serde_json::Map<String, Value>, key: &str) -> String {
@@ -634,6 +675,44 @@ mod tests {
         match &node.kind {
             NodeKind::Heading { level } => assert_eq!(*level, 2),
             other => panic!("Expected Heading, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_date_string_timestamp() {
+        let json = r#"{"type":"date","attrs":{"timestamp":"1582152559000"}}"#;
+        let node = parse_adf(json).unwrap().node;
+        match node.kind {
+            NodeKind::Date { timestamp } => assert_eq!(timestamp, 1582152559000),
+            other => panic!("Expected Date, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_date_rejects_integer_timestamp() {
+        // The ADF spec requires a string; a JSON integer is malformed input.
+        let result = parse_adf(r#"{"type":"date","attrs":{"timestamp":1582152559000}}"#);
+        match result.unwrap_err() {
+            AdfError::InvalidField { field_name, .. } => assert_eq!(field_name, "timestamp"),
+            other => panic!("Expected InvalidField, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_date_missing_timestamp() {
+        let result = parse_adf(r#"{"type":"date","attrs":{}}"#);
+        match result.unwrap_err() {
+            AdfError::MissingField { field_name, .. } => assert_eq!(field_name, "timestamp"),
+            other => panic!("Expected MissingField, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_date_non_numeric_timestamp() {
+        let result = parse_adf(r#"{"type":"date","attrs":{"timestamp":"not-a-number"}}"#);
+        match result.unwrap_err() {
+            AdfError::InvalidField { field_name, .. } => assert_eq!(field_name, "timestamp"),
+            other => panic!("Expected InvalidField, got: {other:?}"),
         }
     }
 

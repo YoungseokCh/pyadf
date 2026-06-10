@@ -12,6 +12,8 @@ class MarkdownConfig:
 
     bullet_marker: BulletMarker = "-"
     show_links: bool = True
+    date_timezone: str = "UTC"
+    date_format: str = "%Y-%m-%dT%H:%M:%S%:z"
 
     def __post_init__(self) -> None:
         if self.bullet_marker not in ("+", "-", "*"):

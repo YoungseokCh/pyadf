@@ -110,6 +110,7 @@ fn render_node(
             render_mention(text.as_deref(), out);
             Ok(())
         }
+        NodeKind::Date { timestamp } => render_date(*timestamp, ctx, out),
         NodeKind::BlockCard { url, data } => {
             render_block_card(url.as_deref(), data.as_deref(), out);
             Ok(())
@@ -488,6 +489,33 @@ fn render_mention(text: Option<&str>, out: &mut String) {
     out.push_str(text.unwrap_or(""));
 }
 
+fn render_date(timestamp_ms: i64, ctx: &RenderContext, out: &mut String) -> Result<(), AdfError> {
+    use chrono::TimeZone;
+    use chrono_tz::Tz;
+
+    let dt_utc = match chrono::Utc.timestamp_millis_opt(timestamp_ms) {
+        chrono::offset::LocalResult::Single(dt) => dt,
+        _ => {
+            return Err(AdfError::InvalidField {
+                field_name: "timestamp".to_string(),
+                invalid_value: timestamp_ms.to_string(),
+                node_type: Some("date".to_string()),
+                node_path: None,
+                expected_values: None,
+            });
+        }
+    };
+
+    // Validated at config construction; fall back to UTC defensively.
+    let tz: Tz = ctx.config.date_timezone.parse().unwrap_or(Tz::UTC);
+    let formatted = dt_utc
+        .with_timezone(&tz)
+        .format(&ctx.config.date_format)
+        .to_string();
+    out.push_str(&formatted);
+    Ok(())
+}
+
 fn render_block_card(url: Option<&str>, data: Option<&str>, out: &mut String) {
     if let Some(url) = url {
         out.push_str(&format!("[{url}]"));
@@ -735,7 +763,7 @@ mod tests {
     #[test]
     fn link_text_hide_when_disabled() {
         let json = r#"{"version":1,"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"click","marks":[{"type":"link","attrs":{"href":"http://example.com/"}}]}]}]}"#;
-        let config = MarkdownConfig::new("-", false).unwrap();
+        let config = MarkdownConfig::new("-", false, "UTC", "%Y-%m-%dT%H:%M:%S%:z").unwrap();
         assert_eq!(convert_with(json, &config), "[click]");
     }
 
@@ -769,7 +797,7 @@ mod tests {
     #[test]
     fn bullet_list_star() {
         let json = r#"{"type":"bulletList","content":[{"type":"listItem","content":[{"type":"paragraph","content":[{"type":"text","text":"A"}]}]}]}"#;
-        let config = MarkdownConfig::new("*", false).unwrap();
+        let config = MarkdownConfig::new("*", false, "UTC", "%Y-%m-%dT%H:%M:%S%:z").unwrap();
         assert_eq!(convert_with(json, &config), "* A");
     }
 
@@ -837,6 +865,46 @@ mod tests {
     fn mention_without_text() {
         let json = r#"{"type":"mention","attrs":{"id":"123"}}"#;
         assert_eq!(convert(json), "");
+    }
+
+    #[test]
+    fn date_default_iso_utc() {
+        // 1582152559000 ms == 2020-02-19T22:49:19Z
+        let json = r#"{"type":"date","attrs":{"timestamp":"1582152559000"}}"#;
+        assert_eq!(convert(json), "2020-02-19T22:49:19+00:00");
+    }
+
+    #[test]
+    fn date_custom_format() {
+        let json = r#"{"type":"date","attrs":{"timestamp":"1582152559000"}}"#;
+        let config = MarkdownConfig::new("-", true, "UTC", "%Y-%m-%d").unwrap();
+        assert_eq!(convert_with(json, &config), "2020-02-19");
+    }
+
+    #[test]
+    fn date_named_timezone_shifts_day() {
+        // 2020-02-19T22:49:19Z is 2020-02-20 in Asia/Seoul (+09:00).
+        let json = r#"{"type":"date","attrs":{"timestamp":"1582152559000"}}"#;
+        let config = MarkdownConfig::new("-", true, "Asia/Seoul", "%Y-%m-%d").unwrap();
+        assert_eq!(convert_with(json, &config), "2020-02-20");
+    }
+
+    #[test]
+    fn date_inline_with_text() {
+        let json = r#"{"version":1,"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Due: "},{"type":"date","attrs":{"timestamp":"1582152559000"}}]}]}"#;
+        assert_eq!(convert(json), "Due: 2020-02-19T22:49:19+00:00");
+    }
+
+    #[test]
+    fn config_rejects_invalid_timezone() {
+        let result = MarkdownConfig::new("-", true, "Mars/Olympus", "%Y-%m-%d");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn config_rejects_invalid_date_format() {
+        let result = MarkdownConfig::new("-", true, "UTC", "%Q");
+        assert!(result.is_err());
     }
 
     #[test]

@@ -92,7 +92,12 @@ def convert_jsonl(
 
     rust_config = None
     if config is not None:
-        rust_config = _core.MarkdownConfig(config.bullet_marker, config.show_links)
+        rust_config = _core.MarkdownConfig(
+            config.bullet_marker,
+            config.show_links,
+            config.date_timezone,
+            config.date_format,
+        )
 
     if isinstance(source, str):
         stream: BinaryIO = open(source, "rb")  # noqa: SIM115

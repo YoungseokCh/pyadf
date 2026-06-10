@@ -113,7 +113,12 @@ class Document:
 
         rust_config = None
         if config is not None:
-            rust_config = _core.MarkdownConfig(config.bullet_marker, config.show_links)
+            rust_config = _core.MarkdownConfig(
+                config.bullet_marker,
+                config.show_links,
+                config.date_timezone,
+                config.date_format,
+            )
 
         markdown, warnings_info = _core.render_markdown(
             self._parsed, rust_config, on_known_unsupported

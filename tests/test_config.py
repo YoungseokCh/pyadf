@@ -40,3 +40,24 @@ class TestShowLinks:
 
     def test_can_disable_link_targets(self):
         assert MarkdownConfig(show_links=False).show_links is False
+
+
+class TestDateConfig:
+    def _date_doc(self) -> dict:
+        # 1582152559000 ms == 2020-02-19T22:49:19Z
+        return {"type": "date", "attrs": {"timestamp": "1582152559000"}}
+
+    def test_defaults(self):
+        config = MarkdownConfig()
+        assert config.date_timezone == "UTC"
+        assert config.date_format == "%Y-%m-%dT%H:%M:%S%:z"
+
+    def test_invalid_timezone_raises(self):
+        config = MarkdownConfig(date_timezone="Mars/Olympus")
+        with pytest.raises(ValueError, match="Invalid date_timezone"):
+            Document(self._date_doc()).to_markdown(config)
+
+    def test_invalid_date_format_raises(self):
+        config = MarkdownConfig(date_format="%Q")
+        with pytest.raises(ValueError, match="Invalid date_format"):
+            Document(self._date_doc()).to_markdown(config)

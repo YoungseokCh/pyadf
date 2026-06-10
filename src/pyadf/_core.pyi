@@ -12,7 +12,15 @@ class MarkdownConfig:
 
     bullet_marker: str
     show_links: bool
-    def __init__(self, bullet_marker: str = "+", show_links: bool = False) -> None: ...
+    date_timezone: str
+    date_format: str
+    def __init__(
+        self,
+        bullet_marker: str = "-",
+        show_links: bool = True,
+        date_timezone: str = "UTC",
+        date_format: str = "%Y-%m-%dT%H:%M:%S%:z",
+    ) -> None: ...
 
 def parse_adf_str(json: str) -> ParsedAdf: ...
 def parse_adf_dict(adf_dict: Any) -> ParsedAdf: ...

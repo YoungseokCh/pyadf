@@ -39,7 +39,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.11", "3.12", "3.13", "3.14"]
+        python-version: ["3.11", "3.12", "3.13", "3.14", "3.15"]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -48,4 +48,6 @@ jobs:
       - run: uv venv --python ${{ matrix.python-version }}
       - run: uv pip install maturin pytest
       - run: uv run maturin develop
+        env:
+          PYO3_USE_ABI3_FORWARD_COMPATIBILITY: "1"
       - run: uv run pytest tests/ -v

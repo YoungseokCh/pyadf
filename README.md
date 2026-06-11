@@ -315,6 +315,7 @@ MIT License — see LICENSE file for details.
 ### Unreleased
 
 - Add `date` node support, rendered via the new `MarkdownConfig.date_timezone` (IANA timezone, default `UTC`) and `date_format` (strftime, default ISO 8601 date-time) options
+- Add Python 3.15 support metadata and CI coverage
 
 ### 0.5.1
 

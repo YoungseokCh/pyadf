@@ -506,7 +506,7 @@ fn extract_attr(raw: &str, name: &str, quote: char) -> Option<String> {
 }
 
 fn html_unescape_attr(value: String) -> String {
-    value.replace("&amp;", "&").replace("&#39;", "'")
+    value.replace("&#39;", "'").replace("&amp;", "&")
 }
 
 fn parse_params_attr(raw: &str) -> Option<Option<String>> {

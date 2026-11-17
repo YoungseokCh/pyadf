@@ -184,6 +184,52 @@ class TestAdfRoundtripExact:
         reparsed = Document.from_markdown(markdown).to_adf()
         assert reparsed == adf
 
+    def test_html_sensitive_text_roundtrip(self):
+        text = "&gt;&lt; <tag> &copy; &#62; &#x3E; AT&T"
+        adf = {
+            "version": 1,
+            "type": "doc",
+            "content": [
+                {"type": "paragraph", "content": [{"type": "text", "text": text}]},
+            ],
+        }
+
+        markdown = Document(adf).to_markdown()
+        reparsed = Document.from_markdown(markdown).to_adf()
+
+        assert markdown == ("&amp;gt;&amp;lt; &lt;tag&gt; &amp;copy; &amp;#62; &amp;#x3E; AT&amp;T")
+        assert "".join(node["text"] for node in reparsed["content"][0]["content"]) == text
+
+    def test_html_sensitive_code_block_language_roundtrip(self):
+        adf = {
+            "version": 1,
+            "type": "doc",
+            "content": [
+                {
+                    "type": "codeBlock",
+                    "attrs": {"language": "&copy;&#62;&#x3E;"},
+                    "content": [{"type": "text", "text": "x"}],
+                }
+            ],
+        }
+
+        markdown = Document(adf).to_markdown()
+
+        assert markdown == "```&amp;copy;&amp;#62;&amp;#x3E;\nx\n```"
+        assert Document.from_markdown(markdown).to_adf() == adf
+
+    def test_html_fallback_entity_literal_roundtrip(self):
+        adf = {
+            "version": 1,
+            "type": "doc",
+            "content": [{"type": "extension", "attrs": {"text": "&#39;"}}],
+        }
+
+        markdown = Document(adf).to_markdown(on_known_unsupported="html")
+
+        assert markdown == '<div adf="extension" params=\'{"text":"&amp;#39;"}\'></div>'
+        assert Document.from_markdown(markdown).to_adf() == adf
+
 
 class TestTaskAdfAttrs:
     def test_task_attrs_are_preserved_in_to_adf(self):

@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use crate::adf_node::{AdfNode, KnownUnsupportedMode, KnownUnsupportedNode, NodeKind};
 use crate::config::MarkdownConfig;
 use crate::errors::AdfError;
@@ -35,6 +37,7 @@ enum ParentKind {
     Table,
     TableRow,
     TableCell,
+    CodeBlock,
 }
 
 /// Render an ADF node tree to markdown with known-unsupported handling.
@@ -174,9 +177,15 @@ fn render_paragraph(
 }
 
 fn render_text(text: &str, marks: &[crate::adf_node::Mark], ctx: &RenderContext, out: &mut String) {
+    let is_code_block = ctx.parent_kind == Some(ParentKind::CodeBlock);
+
     // Fast path: ~70% of text nodes have no marks
     if marks.is_empty() {
-        out.push_str(text);
+        if is_code_block {
+            out.push_str(text);
+        } else {
+            out.push_str(&escape_markdown_html(text));
+        }
         return;
     }
 
@@ -186,7 +195,11 @@ fn render_text(text: &str, marks: &[crate::adf_node::Mark], ctx: &RenderContext,
     let is_strike = marks.iter().any(|m| m.mark_type == "strike");
     let link_mark = marks.iter().find(|m| m.mark_type == "link");
 
-    let mut formatted = text.to_string();
+    let mut formatted = if is_code || is_code_block {
+        text.to_string()
+    } else {
+        escape_markdown_html(text).into_owned()
+    };
 
     if is_code {
         formatted = apply_inline_code(&formatted);
@@ -205,6 +218,7 @@ fn render_text(text: &str, marks: &[crate::adf_node::Mark], ctx: &RenderContext,
         if ctx.config.show_links {
             if let Some(href) = &mark.href {
                 if !href.is_empty() {
+                    let href = escape_markdown_html(href);
                     formatted = format!("{formatted}({href})");
                 }
             }
@@ -435,7 +449,7 @@ fn render_code_block(
     out: &mut String,
     state: &mut RenderState,
 ) -> Result<(), AdfError> {
-    let lang = language.unwrap_or("");
+    let lang = escape_markdown_html(language.unwrap_or(""));
     let mut content = String::new();
     render_children(node, ctx, &mut content, state)?;
 
@@ -449,6 +463,7 @@ fn render_code_block(
 
 fn render_inline_card(url: Option<&str>, data: Option<&str>, out: &mut String) {
     if let Some(url) = url {
+        let url = escape_markdown_html(url);
         out.push_str(&format!("[{url}]"));
     } else if let Some(data) = data {
         out.push_str(&format!("```\n{data}\n```"));
@@ -474,19 +489,15 @@ fn render_heading(
 }
 
 fn render_status(text: &str, out: &mut String) {
-    out.push_str(&format!("**[{text}]**"));
+    out.push_str(&format!("**[{}]**", escape_markdown_html(text)));
 }
 
 fn render_emoji(short_name: &str, text: Option<&str>, out: &mut String) {
-    if let Some(text) = text {
-        out.push_str(text);
-    } else {
-        out.push_str(short_name);
-    }
+    out.push_str(&escape_markdown_html(text.unwrap_or(short_name)));
 }
 
 fn render_mention(text: Option<&str>, out: &mut String) {
-    out.push_str(text.unwrap_or(""));
+    out.push_str(&escape_markdown_html(text.unwrap_or("")));
 }
 
 fn render_date(timestamp_ms: i64, ctx: &RenderContext, out: &mut String) -> Result<(), AdfError> {
@@ -512,12 +523,13 @@ fn render_date(timestamp_ms: i64, ctx: &RenderContext, out: &mut String) -> Resu
         .with_timezone(&tz)
         .format(&ctx.config.date_format)
         .to_string();
-    out.push_str(&formatted);
+    out.push_str(&escape_markdown_html(&formatted));
     Ok(())
 }
 
 fn render_block_card(url: Option<&str>, data: Option<&str>, out: &mut String) {
     if let Some(url) = url {
+        let url = escape_markdown_html(url);
         out.push_str(&format!("[{url}]"));
     } else if let Some(data) = data {
         out.push_str(&format!("```\n{data}\n```"));
@@ -592,6 +604,18 @@ fn unsupported_element(tag: &str, node_type: &str, params: Option<&str>) -> Stri
         attrs.push('\'');
     }
     format!("<{tag}{attrs}></{tag}>")
+}
+
+fn escape_markdown_html(text: &str) -> Cow<'_, str> {
+    if !text.contains('&') && !text.contains('<') && !text.contains('>') {
+        return Cow::Borrowed(text);
+    }
+
+    Cow::Owned(
+        text.replace('&', "&amp;")
+            .replace('<', "&lt;")
+            .replace('>', "&gt;"),
+    )
 }
 
 fn escape_html_attr(text: &str) -> String {
@@ -669,6 +693,7 @@ fn parent_kind_of(kind: &NodeKind) -> Option<ParentKind> {
         NodeKind::TaskList { .. } => Some(ParentKind::TaskList),
         NodeKind::ListItem | NodeKind::TaskItem { .. } => Some(ParentKind::ListItem),
         NodeKind::Heading { .. } => Some(ParentKind::Heading),
+        NodeKind::CodeBlock { .. } => Some(ParentKind::CodeBlock),
         NodeKind::Panel => Some(ParentKind::Panel),
         NodeKind::Blockquote => Some(ParentKind::Blockquote),
         NodeKind::Table => Some(ParentKind::Table),
@@ -719,6 +744,15 @@ mod tests {
     }
 
     #[test]
+    fn html_sensitive_text() {
+        let json = r#"{"type":"paragraph","content":[{"type":"text","text":"&gt;&lt; <tag> &copy; &#62; &#x3E; AT&T"}]}"#;
+        assert_eq!(
+            convert(json),
+            "&amp;gt;&amp;lt; &lt;tag&gt; &amp;copy; &amp;#62; &amp;#x3E; AT&amp;T"
+        );
+    }
+
+    #[test]
     fn bold_text() {
         let json = r#"{"version":1,"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"bold","marks":[{"type":"strong"}]}]}]}"#;
         assert_eq!(convert(json), "**bold**");
@@ -734,6 +768,12 @@ mod tests {
     fn inline_code_text() {
         let json = r#"{"version":1,"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"code","marks":[{"type":"code"}]}]}]}"#;
         assert_eq!(convert(json), "`code`");
+    }
+
+    #[test]
+    fn inline_code_does_not_escape_html() {
+        let json = r#"{"type":"paragraph","content":[{"type":"text","text":"&gt;<tag>","marks":[{"type":"code"}]}]}"#;
+        assert_eq!(convert(json), "`&gt;<tag>`");
     }
 
     #[test]
@@ -758,6 +798,12 @@ mod tests {
     fn link_text_show_by_default() {
         let json = r#"{"version":1,"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"click","marks":[{"type":"link","attrs":{"href":"http://example.com/"}}]}]}]}"#;
         assert_eq!(convert(json), "[click](http://example.com/)");
+    }
+
+    #[test]
+    fn link_text_and_destination_escape_html() {
+        let json = r#"{"type":"paragraph","content":[{"type":"text","text":"&copy;","marks":[{"type":"link","attrs":{"href":"http://e.com/?q=&copy;"}}]}]}"#;
+        assert_eq!(convert(json), "[&amp;copy;](http://e.com/?q=&amp;copy;)");
     }
 
     #[test]
@@ -823,6 +869,18 @@ mod tests {
     fn code_block_no_lang() {
         let json = r#"{"type":"codeBlock","content":[{"type":"text","text":"hello"}]}"#;
         assert_eq!(convert(json), "```\nhello\n```");
+    }
+
+    #[test]
+    fn code_block_does_not_escape_html() {
+        let json = r#"{"type":"codeBlock","content":[{"type":"text","text":"&gt;<tag>"}]}"#;
+        assert_eq!(convert(json), "```\n&gt;<tag>\n```");
+    }
+
+    #[test]
+    fn code_block_language_escapes_html() {
+        let json = r#"{"type":"codeBlock","attrs":{"language":"&copy;&#62;&#x3E;"},"content":[{"type":"text","text":"x"}]}"#;
+        assert_eq!(convert(json), "```&amp;copy;&amp;#62;&amp;#x3E;\nx\n```");
     }
 
     #[test]

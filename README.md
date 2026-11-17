@@ -312,6 +312,11 @@ MIT License — see LICENSE file for details.
 
 ## Changelog
 
+### 0.5.3
+
+- Preserve literal HTML entities and HTML-sensitive characters across ADF → Markdown → ADF round-trips
+- Preserve entity literals in code-block languages and unsupported-node HTML fallback attributes
+
 ### 0.5.2
 
 - Add `date` node support, rendered via the new `MarkdownConfig.date_timezone` (IANA timezone, default `UTC`) and `date_format` (strftime, default ISO 8601 date-time) options
